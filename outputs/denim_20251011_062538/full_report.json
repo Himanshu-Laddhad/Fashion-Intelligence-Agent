@@ -1,0 +1,181 @@
+{
+  "query": "denim",
+  "timestamp": "2025-10-11T06:29:03.643695",
+  "duration_seconds": 205.505874,
+  "summary": "Market analysis reveals 'denim' trending with denim essentials, neutral denim, navy palette. Dominant palette features neutral, navy, black with denim, cotton. Overall aesthetic: casual, versatile. Each brand interpretation balances AI-detected market trends with signature brand identity.",
+  "data_sources": {
+    "pinterest": 12,
+    "zara": 10,
+    "uniqlo": 10,
+    "vogue": 2
+  },
+  "trend_analysis": {
+    "key_trends": [
+      "denim essentials",
+      "neutral denim",
+      "navy palette",
+      "denim construction",
+      "modern denim"
+    ],
+    "dominant_palette": [
+      "neutral",
+      "navy",
+      "black",
+      "white"
+    ],
+    "materials": [
+      "denim",
+      "cotton",
+      "polyester",
+      "wool blend"
+    ],
+    "aesthetic_vibes": [
+      "casual",
+      "versatile",
+      "classic",
+      "rugged"
+    ],
+    "query": "denim",
+    "market_confidence": "high"
+  },
+  "brands": {
+    "old_navy": {
+      "summary": "Accessible denim with vibrant energy and family appeal. Designed for value-conscious consumers seeking stylish options without premium pricing.",
+      "colors": [
+        "neutral",
+        "navy",
+        "bright blue",
+        "coral",
+        "red"
+      ],
+      "materials": [
+        "denim",
+        "polyester",
+        "cotton blend",
+        "nylon"
+      ],
+      "vibes": [
+        "casual",
+        "versatile",
+        "classic",
+        "accessible"
+      ],
+      "products": [
+        {
+          "name": "Help",
+          "color": "neutral",
+          "material": "cotton"
+        },
+        {
+          "name": "Zara denim 2",
+          "color": "neutral",
+          "material": "denim"
+        }
+      ],
+      "target": "Value-conscious families and young adults 18-35",
+      "price_positioning": "Accessible entry-level pricing"
+    },
+    "banana_republic": {
+      "summary": "Elevated denim crafted from premium materials with refined sophistication. For professionals seeking investment pieces with timeless elegance.",
+      "colors": [
+        "neutral",
+        "navy",
+        "black",
+        "charcoal",
+        "camel"
+      ],
+      "materials": [
+        "denim",
+        "cashmere",
+        "silk",
+        "merino wool"
+      ],
+      "vibes": [
+        "casual",
+        "versatile",
+        "classic",
+        "sophisticated"
+      ],
+      "products": [
+        {
+          "name": "Help",
+          "color": "neutral",
+          "material": "cotton"
+        },
+        {
+          "name": "Zara denim 2",
+          "color": "neutral",
+          "material": "denim"
+        },
+        {
+          "name": "Zara denim 3",
+          "color": "neutral",
+          "material": "denim"
+        }
+      ],
+      "target": "Professional urban adults 30-50 with high disposable income",
+      "price_positioning": "Premium positioning with luxury materials"
+    },
+    "gap": {
+      "summary": "Classic denim embodying timeless American style. Quality crafted for the modern consumer seeking versatile essentials.",
+      "colors": [
+        "neutral",
+        "navy",
+        "white",
+        "grey",
+        "denim blue"
+      ],
+      "materials": [
+        "denim",
+        "cotton",
+        "supima cotton",
+        "stretch cotton"
+      ],
+      "vibes": [
+        "casual",
+        "versatile",
+        "classic",
+        "timeless"
+      ],
+      "products": [
+        {
+          "name": "Barrel Jeans",
+          "color": "neutral",
+          "material": "cotton",
+          "image": "https://image.uniqlo.com/UQ/ST3/us/imagesgoods/479000/item/usgoods_62_479000_3x4.jpg?width=150"
+        },
+        {
+          "name": "Uniqlo denim 2",
+          "color": "neutral",
+          "material": "denim",
+          "image": "https://image.uniqlo.com/UQ/ST3/us/imagesgoods/479000/item/usgoods_62_479000_3x4.jpg?width=150"
+        },
+        {
+          "name": "Uniqlo denim 3",
+          "color": "neutral",
+          "material": "denim",
+          "image": "https://image.uniqlo.com/UQ/ST3/WesternCommon/imagesgoods/479000/chip/goods_08_479000_chip.jpg?width=36"
+        }
+      ],
+      "target": "Modern mainstream consumers 25-45",
+      "price_positioning": "Mid-range quality and value"
+    }
+  },
+  "visual_inspiration": {
+    "total_images": 12,
+    "image_urls": [
+      "https://i.pinimg.com/60x60/47/b0/c6/47b0c6fd774248b82ec60415dee377ed.jpg",
+      "https://i.pinimg.com/60x60/c2/51/af/c251af8ab78fc9838b883b0c8c743b86.jpg",
+      "https://i.pinimg.com/60x60/9f/e5/c5/9fe5c5fb8eb05fc6607aab1f7a699dad.jpg",
+      "https://i.pinimg.com/60x60/ae/e8/6f/aee86f12d29ab56c931ac32fa798f413.jpg",
+      "https://i.pinimg.com/60x60/3b/04/86/3b0486ea8f25b494b2c387b8f908bf27.jpg",
+      "https://i.pinimg.com/60x60/ff/c9/a3/ffc9a35aabf19bd1b463d542a31dba4e.jpg",
+      "https://i.pinimg.com/60x60/a6/a3/d9/a6a3d9658327d59a17da90aaa9b1ac5f.jpg",
+      "https://i.pinimg.com/60x60/ec/56/79/ec56799bda0b9cd720a960b118ce0977.jpg",
+      "https://i.pinimg.com/60x60/84/d2/d2/84d2d2d59338c05ac4ed3e8ea7b97be4.jpg",
+      "https://i.pinimg.com/60x60/2b/b5/6c/2bb56cbc6b294a4b290534e307ab7962.jpg",
+      "https://i.pinimg.com/60x60/17/9d/43/179d43f4a1913b2d691f0dcd9b8ad812.jpg",
+      "https://i.pinimg.com/60x60/0f/22/d1/0f22d1c6888cb56a973f5f8c3ae99edf.jpg"
+    ]
+  }
+}

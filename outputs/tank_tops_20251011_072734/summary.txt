@@ -1,0 +1,21 @@
+Fashion Intelligence Report
+============================================================
+
+Query: tank tops
+Timestamp: 2025-10-11T07:30:58.108924
+Duration: 203.5 seconds
+
+Summary:
+Market analysis reveals 'tank tops' trending with tank tops essentials, neutral tank tops, navy palette. Dominant palette features neutral, navy, black with cotton, airism. Overall aesthetic: modern, stylish. Each brand interpretation balances AI-detected market trends with signature brand identity.
+
+Data Sources:
+  - Pinterest: 12 items
+  - Zara: 10 items
+  - Uniqlo: 10 items
+  - Vogue: 3 items
+
+Trend Analysis:
+  Colors: neutral, navy, black, white
+  Materials: cotton, airism, polyester, wool blend
+  Vibes: modern, stylish, versatile
+  Key Trends: tank tops essentials, neutral tank tops, navy palette, cotton construction, modern tank tops

@@ -1,0 +1,180 @@
+{
+  "query": "tshirt",
+  "timestamp": "2025-10-11T09:14:56.939500",
+  "duration_seconds": 197.445904,
+  "summary": "Market analysis reveals 'tshirt' trending with tshirt essentials, neutral tshirt, navy palette. Dominant palette features neutral, navy, black with cotton, polyester. Overall aesthetic: modern, stylish. Each brand interpretation balances AI-detected market trends with signature brand identity.",
+  "data_sources": {
+    "pinterest": 12,
+    "zara": 10,
+    "uniqlo": 10,
+    "vogue": 1
+  },
+  "trend_analysis": {
+    "key_trends": [
+      "tshirt essentials",
+      "neutral tshirt",
+      "navy palette",
+      "cotton construction",
+      "modern tshirt"
+    ],
+    "dominant_palette": [
+      "neutral",
+      "navy",
+      "black",
+      "white"
+    ],
+    "materials": [
+      "cotton",
+      "polyester",
+      "wool blend"
+    ],
+    "aesthetic_vibes": [
+      "modern",
+      "stylish",
+      "versatile",
+      "contemporary"
+    ],
+    "query": "tshirt",
+    "market_confidence": "high"
+  },
+  "brands": {
+    "old_navy": {
+      "summary": "Accessible tshirt with vibrant energy and family appeal. Designed for value-conscious consumers seeking stylish options without premium pricing.",
+      "colors": [
+        "neutral",
+        "navy",
+        "bright blue",
+        "coral",
+        "red"
+      ],
+      "materials": [
+        "cotton",
+        "polyester",
+        "cotton blend",
+        "nylon"
+      ],
+      "vibes": [
+        "modern",
+        "stylish",
+        "versatile",
+        "accessible"
+      ],
+      "products": [
+        {
+          "name": "Help",
+          "color": "neutral",
+          "material": "cotton"
+        },
+        {
+          "name": "Zara tshirt 2",
+          "color": "neutral",
+          "material": "cotton"
+        }
+      ],
+      "target": "Value-conscious families and young adults 18-35",
+      "price_positioning": "Accessible entry-level pricing"
+    },
+    "banana_republic": {
+      "summary": "Elevated tshirt crafted from premium materials with refined sophistication. For professionals seeking investment pieces with timeless elegance.",
+      "colors": [
+        "neutral",
+        "navy",
+        "black",
+        "charcoal",
+        "camel"
+      ],
+      "materials": [
+        "cotton",
+        "cashmere",
+        "silk",
+        "merino wool"
+      ],
+      "vibes": [
+        "modern",
+        "stylish",
+        "versatile",
+        "sophisticated"
+      ],
+      "products": [
+        {
+          "name": "Help",
+          "color": "neutral",
+          "material": "cotton"
+        },
+        {
+          "name": "Zara tshirt 2",
+          "color": "neutral",
+          "material": "cotton"
+        },
+        {
+          "name": "Zara tshirt 3",
+          "color": "neutral",
+          "material": "cotton"
+        }
+      ],
+      "target": "Professional urban adults 30-50 with high disposable income",
+      "price_positioning": "Premium positioning with luxury materials"
+    },
+    "gap": {
+      "summary": "Classic tshirt embodying timeless American style. Quality crafted for the modern consumer seeking versatile essentials.",
+      "colors": [
+        "neutral",
+        "navy",
+        "white",
+        "grey",
+        "denim blue"
+      ],
+      "materials": [
+        "cotton",
+        "polyester",
+        "supima cotton",
+        "stretch cotton"
+      ],
+      "vibes": [
+        "modern",
+        "stylish",
+        "versatile",
+        "timeless"
+      ],
+      "products": [
+        {
+          "name": "SUPIMA® Cotton T-Shirt",
+          "color": "neutral",
+          "material": "cotton",
+          "image": "https://image.uniqlo.com/UQ/ST3/us/imagesgoods/455365/item/usgoods_58_455365_3x4.jpg?width=300"
+        },
+        {
+          "name": "Uniqlo tshirt 2",
+          "color": "neutral",
+          "material": "cotton",
+          "image": "https://image.uniqlo.com/UQ/ST3/us/imagesgoods/455365/item/usgoods_58_455365_3x4.jpg?width=300"
+        },
+        {
+          "name": "Uniqlo tshirt 3",
+          "color": "neutral",
+          "material": "cotton",
+          "image": "https://image.uniqlo.com/UQ/ST3/WesternCommon/imagesgoods/455365/chip/goods_00_455365_chip.jpg?width=36"
+        }
+      ],
+      "target": "Modern mainstream consumers 25-45",
+      "price_positioning": "Mid-range quality and value"
+    }
+  },
+  "visual_inspiration": {
+    "total_images": 12,
+    "image_urls": [
+      "https://i.pinimg.com/60x60/6e/7b/40/6e7b4028b57e7c2c935825deef41cd47.jpg",
+      "https://i.pinimg.com/60x60/2c/d3/79/2cd379feb69d1a20749351c042a365fb.jpg",
+      "https://i.pinimg.com/60x60/b3/93/bc/b393bcee106786cd97c6a9019f2e011e.jpg",
+      "https://i.pinimg.com/60x60/55/a7/b3/55a7b3c80032354bb70888cbcbe79ea6.jpg",
+      "https://i.pinimg.com/60x60/41/f7/36/41f7369eeda26d9302730076cf9118fc.jpg",
+      "https://i.pinimg.com/60x60/1c/0c/99/1c0c99e406cec4652bdc16851004ba5b.jpg",
+      "https://i.pinimg.com/60x60/d6/c7/04/d6c70442a4319a7a8330ca4902fb3f9a.jpg",
+      "https://i.pinimg.com/60x60/8c/fd/bc/8cfdbc7d74cc5f7be78b651c8260e8f3.jpg",
+      "https://i.pinimg.com/60x60/94/6f/d3/946fd3332548694fcaa46fc7324c903a.jpg",
+      "https://i.pinimg.com/60x60/a0/19/f1/a019f1679aeedeb744c30deca233f42a.jpg",
+      "https://i.pinimg.com/60x60/c8/c6/fd/c8c6fd6aced7bdbd20665586f0d508df.jpg",
+      "https://i.pinimg.com/60x60/b7/7f/a6/b77fa60c386d0c61971bf000bd667617.jpg"
+    ]
+  }
+}

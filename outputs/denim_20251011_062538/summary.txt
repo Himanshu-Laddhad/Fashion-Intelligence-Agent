@@ -1,0 +1,21 @@
+Fashion Intelligence Report
+============================================================
+
+Query: denim
+Timestamp: 2025-10-11T06:29:03.643695
+Duration: 205.5 seconds
+
+Summary:
+Market analysis reveals 'denim' trending with denim essentials, neutral denim, navy palette. Dominant palette features neutral, navy, black with denim, cotton. Overall aesthetic: casual, versatile. Each brand interpretation balances AI-detected market trends with signature brand identity.
+
+Data Sources:
+  - Pinterest: 12 items
+  - Zara: 10 items
+  - Uniqlo: 10 items
+  - Vogue: 2 items
+
+Trend Analysis:
+  Colors: neutral, navy, black, white
+  Materials: denim, cotton, polyester, wool blend
+  Vibes: casual, versatile, classic
+  Key Trends: denim essentials, neutral denim, navy palette, denim construction, modern denim

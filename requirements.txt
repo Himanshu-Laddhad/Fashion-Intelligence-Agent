@@ -1,0 +1,31 @@
+# Web Framework
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# Streamlit
+streamlit>=1.28.0
+
+# Data Processing
+pandas>=2.0.0
+requests>=2.31.0
+
+# Scraping
+firecrawl-py>=0.0.16
+crawl4ai>=0.3.0
+beautifulsoup4>=4.12.2
+lxml>=4.9.0
+feedparser>=6.0.10
+
+# Selenium (for Pinterest)
+selenium>=4.12.0
+webdriver-manager>=4.0.0
+
+# Async
+aiohttp>=3.9.0
+
+# AI/LLM - FREE & FAST
+groq>=0.4.0
+
+# Utils
+python-dateutil>=2.8.2
+python-dotenv>=1.0.0

@@ -1,0 +1,21 @@
+Fashion Intelligence Report
+============================================================
+
+Query: denim shorts
+Timestamp: 2025-10-11T06:40:37.858751
+Duration: 208.9 seconds
+
+Summary:
+Market analysis reveals 'denim shorts' trending with denim shorts essentials, neutral denim shorts, navy palette. Dominant palette features neutral, navy, black with denim, cotton. Overall aesthetic: casual, versatile. Each brand interpretation balances AI-detected market trends with signature brand identity.
+
+Data Sources:
+  - Pinterest: 12 items
+  - Zara: 10 items
+  - Uniqlo: 10 items
+  - Vogue: 3 items
+
+Trend Analysis:
+  Colors: neutral, navy, black, white
+  Materials: denim, cotton, polyester, wool blend
+  Vibes: casual, versatile, classic
+  Key Trends: denim shorts essentials, neutral denim shorts, navy palette, denim construction, modern denim shorts
