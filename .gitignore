@@ -24,6 +24,10 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# Generated outputs — ignore contents but keep the folder via .gitkeep
+outputs/*
+!outputs/.gitkeep
+
 # OS / editor
 .DS_Store
 Thumbs.db
