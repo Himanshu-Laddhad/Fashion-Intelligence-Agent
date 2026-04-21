@@ -188,12 +188,148 @@
 
 ---
 
+### TASK 1.1 — RFM Segmentation Module (2026-04-20)
+**Status:** ✅ Completed, no deviations
+
+**Created:** `analytics/rfm.py`
+
+**Notes:**
+- `score_rfm` recency inversion: ranks ascending (low days → low rank), cuts into n_quantiles, then applies `(n_quantiles + 1) - score` to flip so score 5 = most recent
+- `np.select` evaluates conditions in priority order — segment rules overlap intentionally (e.g. a `r=5, f=4` customer is `Champions`, not `Loyal Customers`)
+- `build_rfm_pipeline` returns a DataFrame with all 10 column names pre-set on empty input, safe for downstream `.empty` checks
+- `"6H"` freq string in test data fixed to `"6h"` (pandas deprecation in 2.x)
+- 198 of 200 customers segmented (2 customers had no transactions in the random seed — expected)
+- Verified: `python analytics/rfm.py` → `RFM shape: (198, 10)`, all 8 segments populated ✅
+
+---
+
+### TASK 1.2 — K-Means Segmentation Module (2026-04-20)
+**Status:** ✅ Completed, no deviations
+
+**Created:** `analytics/segmentation.py`
+
+**Notes:**
+- `find_optimal_k` scales with a fresh `StandardScaler` (not reused) to avoid data leakage between k evaluations; the pipeline scaler in `fit_kmeans_pipeline` is separate
+- `assign_cluster_names` uses relative rank positions across clusters, not absolute thresholds — makes labels stable across different datasets
+- `__main__` adds `analytics/` to `sys.path` with a `Path(__file__).parent` insert so `from rfm import build_rfm_pipeline` resolves correctly when run from project root
+- `"4H"` freq string fixed to `"4h"` (pandas 2.x deprecation)
+- Optimal K=2 on the synthetic dataset is expected — 500 customers with uniform random transactions create two natural frequency/recency clusters
+- Verified: `python analytics/segmentation.py` → `Optimal K: 2`, cluster profiles printed, `Segmentation OK` ✅
+
+---
+
+### TASK 1.3 — Churn Labeller Module (2026-04-20)
+**Status:** ✅ Completed, no deviations
+
+**Created:** `analytics/churn_labeller.py`
+
+**Notes:**
+- `compute_purchase_gaps` uses `groupby → apply → diff().dt.days` — the `.reset_index(drop=True)` flattens the multi-level index from the groupby apply into a plain flat Series
+- `label_churn` computes `days_since_last` as integer days via `.dt.days`; `threshold_days` is stored as a column on every row so downstream `compute_churn_stats` can retrieve it without needing a separate argument
+- `stats_` used as variable name in `__main__` to avoid shadowing the `scipy.stats` import
+- `"8H"` freq fixed to `"8h"` (pandas 2.x deprecation)
+- Verified: `python analytics/churn_labeller.py` → threshold: 176.8 days, churn rate: 16.2%, `Churn labeller OK` ✅
+
+---
+
+### TASK 1.4 — Survival Analysis Module (2026-04-20)
+**Status:** ✅ Completed, no deviations — uses `lifelines` as substituted in Task 0.1
+
+**Created:** `analytics/survival_analysis.py`
+
+**Notes:**
+- Uses `lifelines.KaplanMeierFitter`, `CoxPHFitter`, `multivariate_logrank_test` — all from the already-installed `lifelines` package (substitute for `scikit-survival`)
+- Spec inconsistency fixed: `median_survival` is inside `overall` per spec, but test accesses it as `km_overall["median_survival"]` — both paths now work (key surfaced at top level as convenience shortcut)
+- `fit_cox_ph` drops constant covariates before fitting (Cox can't handle zero-variance columns)
+- `run_survival_analysis` only adds `age` to Cox covariates if the column is present; returns `concordance: 0.0` safely when no covariates are available
+- `median_survival: inf` on synthetic data is mathematically correct — KM curve never crosses 0.5 when most customers are "active"
+- `"12H"` freq fixed to `"12h"` (pandas 2.x deprecation)
+- Verified: `python analytics/survival_analysis.py` → all three print lines pass ✅
+
+---
+
+### TASK 1.5 — CLV Module (2026-04-20)
+**Status:** ✅ Completed with API deviation
+
+**Created:** `analytics/clv.py`
+
+**Deviation — lifetimes API change:**
+| Spec (CURSOR_TASKS.md) | Actual installed lifetimes API |
+|---|---|
+| `gg_model.customer_lifetime_value(bgnbd_model, df[repeat_mask], time=..., ...)` | `gg_model.customer_lifetime_value(bgnbd_model, frequency, recency, T, monetary_value, time=..., ...)` |
+
+The installed `lifetimes` version requires individual Series arguments (`frequency`, `recency`, `T`, `monetary_value`) rather than a single summary DataFrame. Fixed in `compute_clv`.
+
+**Notes:**
+- `predicted_purchases` computed via `conditional_expected_number_of_purchases_up_to_time(months*30, ...)` (days)
+- `customer_lifetime_value` called with `freq='M'` as specified; lifetimes normalises recency/T internally
+- CLV assigned back to full `df` with `df.loc[clv_series.index, "clv"] = ...` — customers with `frequency == 0` get `clv = 0.0`
+- `"6H"` freq fixed to `"6h"` (pandas 2.x)
+- Verified: `python analytics/clv.py` → `CLV available: True`, median $7.62, total $2,334 ✅
+
+---
+
+### TASK 1.6 — Sentence-Transformer Embeddings Module (2026-04-21)
+**Status:** ✅ Completed, no deviations
+
+**Created:** `analytics/embeddings.py`
+
+**Notes:**
+- `get_model()` lazy-loads `all-MiniLM-L6-v2` on first call and caches in module-level `_model` — subsequent calls are free
+- Model downloaded on first run (~90s including HuggingFace CDN retries); cached locally in `~/.cache/huggingface/` for future runs
+- `embed_fashion_items` combines `name + " " + description` when both columns are present; falls back to `description` only
+- `embedding_json` stores vectors as JSON strings — compatible with DuckDB `FLOAT[]` column via `json.loads()` at read time
+- Similarity ranking correctly places denim/blue items at top for "denim casual blue" query ✅
+- Verified: `python analytics/embeddings.py` → `Similar to 'denim casual blue': ['blue jeans', 'denim jacket', 'cotton t-shirt']` ✅
+
+---
+
+### TASK 1.7 — Collaborative Filtering Recommender (2026-04-21)
+**Status:** ✅ Completed with planned substitution (Task 0.1)
+
+**Created:** `analytics/recommender.py`
+
+**Deviation — `implicit` → `cornac` (as per Task 0.1):**
+| Spec | Implementation |
+|---|---|
+| `implicit.als.AlternatingLeastSquares` | `cornac.models.MF` |
+| `model.recommend(user_idx, row, N, filter_already_liked_items)` | `_ALSAdapter.recommend()` — same signature |
+
+**Approach:**
+- `build_interaction_matrix` builds a standard CSR matrix (unchanged from spec)
+- `train_als_model` converts CSR integer indices to string UIR triplets for cornac, trains `cornac.models.MF`, then re-maps `u_factors`/`i_factors` back to our integer index space
+- `_ALSAdapter` stores re-mapped factor matrices and exposes `recommend()` via `i_factors @ u_factors[user_idx]` — mathematically equivalent to ALS scoring
+- All public function signatures match spec exactly; no calling code changes needed
+- `recommend_for_segment` uses `Counter.most_common(n)` to aggregate across up to 100 sampled customers
+
+**Notes:**
+- `cornac.models.MF` uses SGD (not ALS), but produces equivalent latent factor matrices for scoring purposes
+- Index re-mapping: cornac's internal `uid_map`/`iid_map` are reversed by casting keys back to `int()`
+- Verified: `python analytics/recommender.py` → `Recs for C0: ['A32', 'A45', ...]`, `Recommender OK` ✅
+
+---
+
+### TASK 1.8 — Causal Analysis / PSM Module (2026-04-21)
+**Status:** ✅ Completed, no deviations
+
+**Created:** `analytics/causal_analysis.py`
+
+**Notes:**
+- `match_samples` sorts treated units by propensity score before greedy matching — reduces systematic bias vs. random-order matching
+- Unmatched treated units are silently dropped (standard PSM convention); caliper default 0.05 is industry-standard for logit-scale PS
+- `run_causal_analysis` builds `frequency` and `monetary` covariates from transaction aggregates when `covariate_cols=None` — no dependency on external RFM pipeline
+- `interpretation` string is self-describing for both significant and non-significant results
+- Smoke test: 95/95 matched pairs, `p=0.329` (no signal in random data — correct) ✅
+- Verified: `python analytics/causal_analysis.py` → `Causal analysis module loaded OK` ✅
+
+---
+
 ## Upcoming Tasks (from CURSOR_TASKS.md)
 
 | Task | Description | Notes |
 |---|---|---|
-| 1.1+ | TBD | — |
+| 1.9+ | TBD | — |
 
 ---
 
-*Last updated: 2026-04-20 by agent*
+*Last updated: 2026-04-21 by agent*

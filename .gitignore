@@ -36,9 +36,27 @@ data/hm/**
 mlruns/
 mlartifacts/
 
+# Serialised model files
+*.pkl
+*.joblib
+*.pickle
+
 # DuckDB files
 *.duckdb
 *.duckdb.wal
+
+# Data files — prevent accidental large-file commits
+*.parquet
+*.feather
+*.arrow
+
+# Any data/ subdirectory contents (keep .gitkeep placeholders only)
+data/**
+!data/**/.gitkeep
+
+# HuggingFace / sentence-transformers local model cache (if overridden into project)
+.cache/
+models/
 
 # OS / editor
 .DS_Store
