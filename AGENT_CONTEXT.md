@@ -324,11 +324,96 @@ The installed `lifetimes` version requires individual Series arguments (`frequen
 
 ---
 
+### TASK 1.9 — MLflow Observability Tracker (2026-04-21)
+**Status:** ✅ Completed with proactive improvement
+
+**Created:** `observability/__init__.py` (empty), `observability/mlflow_tracker.py`
+
+**Proactive deviation — SQLite backend:**
+| Spec | Implementation |
+|---|---|
+| `mlflow.set_tracking_uri("mlruns")` (filesystem) | `mlflow.set_tracking_uri("sqlite:///mlruns/mlflow.db")` (SQLite) |
+
+Reason: MLflow's filesystem tracking store was deprecated February 2026. Running in April 2026, the filesystem backend triggers a `FutureWarning` and may break in a future MLflow release. Switched to SQLite backend (`mlruns/mlflow.db`) which is the recommended local replacement. `*.db` added to `.gitignore`.
+
+**Notes:**
+- `setup_mlflow` creates `mlruns/` directory if missing before setting the URI
+- `log_segmentation_run` saves cluster profiles as a temp CSV artifact — uses `tempfile.NamedTemporaryFile` (cross-platform)
+- `log_survival_run` guards `median_survival=inf` (common when KM curve never crosses 0.5) — maps to 0.0 for MLflow metric compatibility
+- MLflow DB initialisation INFO logs appear only on first run
+- `*.db`, `*.db-shm`, `*.db-wal` added to `.gitignore`
+- Verified: `python observability/mlflow_tracker.py` → `MLflow run logged: <uuid>`, `MLflow tracker OK` ✅
+
+---
+
+### TASK 2.0 — Pandera Data Validators (2026-04-21)
+**Status:** ✅ Completed with import fix
+
+**Created:** `observability/data_validators.py`
+
+**Proactive fix — pandera import:**
+| Spec | Implementation |
+|---|---|
+| `import pandera as pa` | `import pandera.pandas as pa` |
+
+Reason: `pandera>=0.18.0` deprecates top-level `import pandera as pa` for pandas usage — triggers `FutureWarning`. Correct import is `import pandera.pandas as pa`.
+
+**Notes:**
+- All 4 schemas use `coerce=True` at the schema level (cast mismatches instead of rejecting)
+- `validate_df` uses `lazy=True` to collect all failures before returning — error count from `len(exc.failure_cases)`
+- `validate_df` prints warnings but never raises — safe to call at pipeline boundaries without breaking execution
+- `pa.DateTime` maps to pandas datetime64 dtype correctly with `import pandera.pandas as pa`
+- Verified: `python observability/data_validators.py` → `RFM input valid: True | Errors: 0`, `Validators OK` ✅
+
+---
+
+### TASK 2.1 — Analytics Dashboard Streamlit Page (2026-04-21)
+**Status:** ✅ Completed, no deviations
+
+**Created:** `pages/analytics_dashboard.py`
+
+**Notes:**
+- Uses `pd.DataFrame | None` return type hint for `_safe_read` — requires Python 3.10+ union syntax (Python 3.13 ✅)
+- All 6 DB reads wrapped in `_safe_read` which catches any exception (DB not found, empty table, schema mismatch) and shows `st.warning` — page never crashes
+- `customer_segments` scatter uses `recency_days` column name (matches `database/schema.sql`) not `recency` (which is the RFM intermediate name)
+- `st.rerun()` used for refresh button — `st.experimental_rerun()` is deprecated in Streamlit 1.28+
+- Page is Streamlit multi-page compatible (`pages/` directory, `set_page_config` at top)
+- No Flask API calls — reads directly from DuckDB via `DatabaseManager`
+- Verified: `python -c "import ast; ast.parse(...)"` → **Syntax OK**, no linter errors ✅
+
+---
+
+### TASK 2.2 — run_customer_analysis.py standalone pipeline script (2026-04-21)
+**Status:** ✅ Completed
+
+**Created:** `run_customer_analysis.py` (project root)
+
+**Notes:**
+- Script is runnable with `python run_customer_analysis.py` or `python run_customer_analysis.py --sample N`
+- Added `sys.stdout.reconfigure(encoding="utf-8", errors="replace")` at top to support emoji output on Windows cp1252 terminals; **requires `-u` (unbuffered) flag or `PYTHONUTF8=1` env var to flush output progressively** (buffering suppresses output otherwise — discovered in live test)
+- Recommended invocation: `$env:PYTHONUTF8="1"; python -u run_customer_analysis.py`
+- DuckDB save: `save_df` columns are ordered exactly to match `customer_segments` schema column order (`_CS_COLS` constant) before `INSERT INTO customer_segments SELECT * FROM save_df`
+- Extracted `_save_customer_segments()` helper to keep `run_analysis()` readable; wraps in `try/except` to prevent DB errors from blocking MLflow logging
+- `survival_result.get("available", True)` correctly handles both: absent key (= success dict) and `{"available": False}` (= skipped)
+- `median_survival` infinity guard: prints `"∞"` instead of crashing on `:.0f` format spec
+- `cluster_label` column falls back through `cluster_name` → `segment` → `"Unknown"` in case segmentation returns different key names
+- `rfm_string` column presence is guarded: `if "rfm_string" in segments_df.columns else "000"` to avoid KeyError
+- Live test with real H&M data (1.37M customers, 31M transactions, 50k sample):
+  - Load: 1,167,771 transactions, 50,000 customers, 105,542 articles ✅
+  - RFM: 8 segments ✅ | Segmentation: optimal K=2 ✅
+  - Churn: 80.4% rate (33-day threshold) ✅
+  - Survival: median 386 days, Cox concordance 0.528 ✅
+  - CLV: median $0.00 (most customers < 2 purchases — BG/NBD filters them out), total $474 ✅
+  - Recommender: trained ✅ | DuckDB: 50,000 rows saved ✅ | MLflow: logged ✅
+  - Total runtime: ~5 min 25 sec on 50k customer sample
+
+---
+
 ## Upcoming Tasks (from CURSOR_TASKS.md)
 
 | Task | Description | Notes |
 |---|---|---|
-| 1.9+ | TBD | — |
+| 2.3+ | TBD | — |
 
 ---
 

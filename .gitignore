@@ -45,6 +45,11 @@ mlartifacts/
 *.duckdb
 *.duckdb.wal
 
+# SQLite (MLflow tracking DB)
+*.db
+*.db-shm
+*.db-wal
+
 # Data files — prevent accidental large-file commits
 *.parquet
 *.feather
