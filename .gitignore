@@ -24,9 +24,21 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# Generated outputs — ignore contents but keep the folder via .gitkeep
-outputs/*
+# Generated outputs — ignore all contents but keep folder structure via .gitkeep
+outputs/**
 !outputs/.gitkeep
+
+# H&M Kaggle dataset — large CSVs, not committed to repo
+data/hm/**
+!data/hm/.gitkeep
+
+# MLflow / model artefacts
+mlruns/
+mlartifacts/
+
+# DuckDB files
+*.duckdb
+*.duckdb.wal
 
 # OS / editor
 .DS_Store

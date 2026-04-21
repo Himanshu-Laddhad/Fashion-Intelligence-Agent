@@ -127,11 +127,72 @@
 
 ---
 
+### TASK 0.7 — Trend Velocity Scorer (2026-04-20)
+**Status:** ✅ Completed, no deviations
+
+**Created:** `analytics/__init__.py` (empty), `analytics/trend_scorer.py`
+
+**Notes:**
+- `score_retail_presence` uses `dropna(how="all")` to skip fully-empty rows before counting
+- `score_social` upvote boost only applied when `avg_upvotes > 0` (guards log1p(0) = 0 edge case)
+- `confidence` logic: `"high"` requires all three components > 20; `"medium"` requires tvi > 30; else `"low"`
+- Module-level `score_trend()` is a convenience wrapper — instantiates a fresh `TrendVelocityScorer` each call
+- Verified: `python analytics/trend_scorer.py` → `tvi: 50.25, confidence: medium` + assertions pass ✅
+
+---
+
+### TASK 0.8 — Wire TVI into Orchestrator (2026-04-20)
+**Status:** ✅ Completed, no deviations
+
+**Touched:** `backend/orchestrator.py` (4 additions, nothing removed or changed)
+
+**Additions:**
+1. Lines 24–25: `from analytics.trend_scorer import score_trend` + `from data_sources.google_trends import get_trend_signal`
+2. Lines 144–165: Step 3.5 block — calls `get_trend_signal` then `score_trend`; full `except` block sets `google_signal = {}` so result dict guard `'google_signal' in dir()` always resolves cleanly
+3. Lines 169–175: DB persist block updated from placeholder `0.0` values to live `tvi_result.get(...)` values
+4. Lines 215–216: `"tvi"` and `"google_signal"` keys added to result dict
+
+**Notes:**
+- `google_signal = {}` is explicitly set in the `except` branch so `'google_signal' in dir()` always evaluates to `True` — the `dir()` guard is still kept for safety per spec
+- `get_trend_signal` makes a live pytrends call; adds ~8s per query run (includes 2s sleep from Task 0.5)
+- Verified: `python -c "import ast; ast.parse(...)"` → **Syntax OK** ✅
+
+---
+
+### TASK 0.9 — Prophet Trend Forecaster (2026-04-20)
+**Status:** ✅ Completed, no deviations
+
+**Created:** `analytics/trend_forecaster.py`
+
+**Notes:**
+- `prophet` installed cleanly (no MSVC needed) — no substitution required
+- `warnings.filterwarnings("ignore")` suppresses Prophet's FutureWarnings
+- cmdstanpy re-registers its `StreamHandler` on every `model.fit()` call, so `logging.getLogger` level-setting alone is insufficient. Fix: `logging.disable(logging.INFO)` bracketing the `fit()` call, restored to `logging.NOTSET` in `finally`
+- stdout is also redirected during fit via `io.StringIO()` as belt-and-braces suppression
+- `prepare_prophet_df` handles both DatetimeIndex (pytrends output) and plain `ds`/`date` column DataFrames
+- `fit_and_forecast` uses future-only rows for direction calc; `ds` serialised to `"%Y-%m-%d"` strings in the returned forecast records (JSON-safe)
+- Verified: `python analytics/trend_forecaster.py` → `Forecast available: True` + `Forecaster OK`, no log noise ✅
+
+---
+
+### TASK 1.0 — Statistical Trend Tests (2026-04-20)
+**Status:** ✅ Completed, no deviations
+
+**Created:** `analytics/statistical_tests.py`
+
+**Notes:**
+- `run_mann_kendall` guards for no-numeric-column case in addition to the spec's < 10 rows guard
+- `compute_descriptive_stats` returns `float("nan")` for `cv` when `mean == 0` (avoids ZeroDivisionError)
+- `test_trend_significance` resets the series index before midpoint split so `iloc` is positionally correct after `dropna()`
+- Verified: `python analytics/statistical_tests.py` → `MK significant: True`, `Trend: increasing`, `Statistical tests OK` ✅
+
+---
+
 ## Upcoming Tasks (from CURSOR_TASKS.md)
 
 | Task | Description | Notes |
 |---|---|---|
-| 0.7+ | TBD | — |
+| 1.1+ | TBD | — |
 
 ---
 

@@ -21,6 +21,8 @@ from scrapers.uniqlo_scraper import scrape_uniqlo
 from scrapers.vogue_scraper import scrape_vogue
 from backend.ai_analyzer import analyze_fashion_data_ai_driven, customize_for_brands_ai_driven
 from database.db_manager import DatabaseManager
+from analytics.trend_scorer import score_trend
+from data_sources.google_trends import get_trend_signal
 
 
 async def run_fashion_query(query: str, output_dir: Path) -> Dict[str, Any]:
@@ -139,13 +141,38 @@ async def run_fashion_query(query: str, output_dir: Path) -> Dict[str, Any]:
     print("✅ Brand customizations complete")
     print("-" * 60 + "\n")
 
+    # Step 3.5: Compute Trend Velocity Index
+    print("📈 Step 3.5: Computing Trend Velocity Index...")
+    print("-" * 60)
+
+    try:
+        google_signal = get_trend_signal(query)
+        tvi_result = score_trend(
+            query=query,
+            zara_df=zara_df,
+            uniqlo_df=uniqlo_df,
+            google_momentum=google_signal
+        )
+        print(f"   TVI Score: {tvi_result['tvi']:.1f}/100 (confidence: {tvi_result['confidence']})")
+        print(f"   Google: {tvi_result['google_score']:.1f} | Social: {tvi_result['social_score']:.1f} | Retail: {tvi_result['retail_score']:.1f}")
+    except Exception as e:
+        print(f"   ⚠️ TVI computation failed: {e}")
+        tvi_result = {"tvi": 0.0, "confidence": "error", "google_score": 0.0, "social_score": 0.0, "retail_score": 0.0}
+        google_signal = {}
+
+    print("-" * 60 + "\n")
+
     # --- Persist trend scores ---
     with DatabaseManager() as db:
         db.save_trend_score(
             query=query,
-            tvi_score=0.0,  # placeholder until TVI module is built
-            component_scores={"google": 0.0, "social": 0.0, "retail": len(zara_df) + len(uniqlo_df)},
-            confidence="pending"
+            tvi_score=tvi_result.get("tvi", 0.0),
+            component_scores={
+                "google": tvi_result.get("google_score", 0.0),
+                "social": tvi_result.get("social_score", 0.0),
+                "retail": tvi_result.get("retail_score", 0.0)
+            },
+            confidence=tvi_result.get("confidence", "unknown")
         )
 
     # Step 4: Collect all images for shared visual inspiration (Pinterest only, max 12)
@@ -185,6 +212,8 @@ async def run_fashion_query(query: str, output_dir: Path) -> Dict[str, Any]:
         "timestamp": datetime.now().isoformat(),
         "duration_seconds": duration,
         "images": unique_images[:12],  # Limit to 12 images max
+        "tvi": tvi_result,
+        "google_signal": google_signal if 'google_signal' in dir() else {},
         "trend_analysis": trend_analysis,
         "old_navy": brand_customizations.get("old_navy", {}),
         "banana_republic": brand_customizations.get("banana_republic", {}),
