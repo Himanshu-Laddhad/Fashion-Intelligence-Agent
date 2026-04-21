@@ -20,6 +20,7 @@ from scrapers.zara_scraper import scrape_zara
 from scrapers.uniqlo_scraper import scrape_uniqlo
 from scrapers.vogue_scraper import scrape_vogue
 from backend.ai_analyzer import analyze_fashion_data_ai_driven, customize_for_brands_ai_driven
+from database.db_manager import DatabaseManager
 
 
 async def run_fashion_query(query: str, output_dir: Path) -> Dict[str, Any]:
@@ -87,7 +88,20 @@ async def run_fashion_query(query: str, output_dir: Path) -> Dict[str, Any]:
         zara_df = pd.DataFrame()
         uniqlo_df = pd.DataFrame()
         vogue_df = pd.DataFrame()
-    
+
+    # --- Persist raw scrape data ---
+    with DatabaseManager() as db:
+        if not pinterest_df.empty:
+            db.save_trend_snapshot(query, "pinterest", pinterest_df)
+        if not zara_df.empty:
+            db.save_fashion_items(query, "zara", zara_df)
+            db.save_trend_snapshot(query, "zara", zara_df)
+        if not uniqlo_df.empty:
+            db.save_fashion_items(query, "uniqlo", uniqlo_df)
+            db.save_trend_snapshot(query, "uniqlo", uniqlo_df)
+        if not vogue_df.empty:
+            db.save_trend_snapshot(query, "vogue", vogue_df)
+
     print("\n" + "-" * 60)
     print("📈 Data Collection Summary:")
     print(f"   Pinterest Images: {len(pinterest_df)}")
@@ -124,7 +138,16 @@ async def run_fashion_query(query: str, output_dir: Path) -> Dict[str, Any]:
     
     print("✅ Brand customizations complete")
     print("-" * 60 + "\n")
-    
+
+    # --- Persist trend scores ---
+    with DatabaseManager() as db:
+        db.save_trend_score(
+            query=query,
+            tvi_score=0.0,  # placeholder until TVI module is built
+            component_scores={"google": 0.0, "social": 0.0, "retail": len(zara_df) + len(uniqlo_df)},
+            confidence="pending"
+        )
+
     # Step 4: Collect all images for shared visual inspiration (Pinterest only, max 12)
     print("🖼️  Step 4: Organizing Visual Inspiration...")
     

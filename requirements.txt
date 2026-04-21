@@ -29,3 +29,22 @@ groq>=0.4.0
 # Utils
 python-dateutil>=2.8.2
 python-dotenv>=1.0.0
+
+# Phase 1+ Dependencies
+duckdb>=0.10.0
+pytrends>=4.9.0
+praw>=7.7.0
+prophet>=1.1.5
+lifetimes>=0.11.3
+cornac>=1.18.0
+sentence-transformers>=2.7.0
+# pysurvival skipped — source-only, no Python 3.13 wheels; lifelines (below) covers survival analysis
+lifelines>=0.27.0
+mlflow>=2.13.0
+pandera>=0.18.0
+umap-learn>=0.5.6
+hdbscan>=0.8.33
+statsmodels>=0.14.0
+scipy>=1.11.0
+plotly>=5.20.0
+pymannkendall>=1.4.3
