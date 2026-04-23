@@ -2,7 +2,7 @@
 Firecrawl Configuration
 """
 
-FIRECRAWL_API_KEY = "fc-674263963d2e416d8395037d12018cf3"
+FIRECRAWL_API_KEY = "fc-a4620090c90c4032b593aa9de2945484"
 
 # Scraping options for different sources
 SCRAPE_OPTIONS = {
