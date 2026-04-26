@@ -2,6 +2,7 @@
 .env
 .env.local
 .env.*.local
+auth.json
 
 # Python
 __pycache__/
@@ -68,7 +69,7 @@ models/
 Thumbs.db
 *.swp
 *~
-
-# Local agent/context docs
-AGENT_CONTEXT.md
-GEMINI_RULES.md
+ 
+ # secrets
+ auth.json
+ 
