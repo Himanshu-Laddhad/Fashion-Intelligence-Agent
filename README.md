@@ -1,226 +1,255 @@
 # Fashion Intelligence Studio
 
-> Real-time fashion trend analysis + customer intelligence — powered by Groq LLM, DuckDB, and a full analytics pipeline.
+A Streamlit fashion trend dashboard that combines Google Trends signals, Pinterest image scraping, and Groq-powered text/vision analysis.
 
 ---
 
-## What it does
+## What this project currently includes
 
-| Layer | What it does |
-|---|---|
-| **Trend Scraping** | Fetches live data from Pinterest and Google Trends |
-| **AI Analysis** | Summarises trends and generates brand-specific insights using Groq LLM (text + vision) |
-| **Image Intelligence** | Verifies and captions fashion images using Groq's Llama 4 Scout vision model |
-| **Trend Velocity Index** | Scores each trend using Google Trends + social + retail presence |
-| **Customer Intelligence** | RFM segmentation, churn labelling, CLV prediction, survival analysis, collaborative filtering |
-| **Analytics Dashboard** | Live Streamlit page reading directly from DuckDB |
-| **Experiment Tracking** | MLflow logs every analytics run with parameters and metrics |
+### Core capabilities
 
----
+- Live Google Trends analysis for a user-generated fashion query
+- Trend momentum scoring with directional classification
+- Packed bubble chart for related trend terms (monochrome, size by score)
+- Regional interest visualization (interactive globe + word cloud)
+- Pinterest image scraping, deduplication, and relevance verification
+- Groq LLM dashboard copy generation
+- Optional AI-derived palette and vibe sections
+- Local SQLite caching for trend data and image metadata
 
-## Architecture
+### Tech stack
 
-```
-app.py  ──────────────────►  server.py (Flask API)
-(Streamlit UI)                    │
-                                  ▼
-                         backend/orchestrator.py
-                         ├── scrapers/  (Pinterest, Zara, Uniqlo, Vogue)
-                         ├── data_sources/google_trends.py
-                         ├── analytics/trend_scorer.py  (TVI)
-                         └── database/db_manager.py  (DuckDB)
-
-run_customer_analysis.py  (standalone batch script)
-├── data_sources/hm_loader.py
-├── analytics/  (rfm → segmentation → churn → survival → clv → recommender)
-├── database/db_manager.py
-└── observability/  (mlflow_tracker, data_validators)
-
-pages/analytics_dashboard.py  (Streamlit multi-page, reads DuckDB directly)
-```
+- Frontend: Streamlit, Plotly, Matplotlib, WordCloud
+- Data: pandas, pytrends, SQLite
+- Scraping: Selenium (Pinterest)
+- AI: Groq (text + vision)
 
 ---
 
-## Project structure
+## Why these design choices
 
-```
+- Streamlit for rapid iteration:
+  The app is analytics-first and interactive. Streamlit keeps UI and data code in one place, reducing overhead.
+
+- pytrends as primary signal source:
+  Google Trends provides normalized public interest data that is easy to compare over time and across regions.
+
+- SQLite cache (`outputs/trend_cache.db`):
+  Avoids repeated pytrends/scraping calls for the same query and timeframe, improving responsiveness and reducing rate-limit pressure.
+
+- Groq for both text and vision:
+  Single provider simplifies configuration and avoids mixed-provider failure modes.
+
+- Pinterest + LLM verification:
+  Pinterest retrieval is high recall; vision verification improves precision for trend relevance.
+
+---
+
+## Architecture and flow
+
+1. User selects filters in Streamlit UI (`app.py`)
+2. App builds a search phrase from filter values
+3. App checks cache (`db.py`)
+4. If cache miss:
+   - Fetch Google Trends time series
+   - Fetch Google Trends regional interest
+   - Fetch related queries and build term list
+   - Save all to SQLite
+5. App computes momentum metrics
+6. App requests editorial copy from Groq (`backend/ai_analyzer.py`)
+7. App loads or scrapes Pinterest images (`scrapers/pinterest_scraper.py`)
+8. App verifies/captions images with Groq vision
+9. App renders charts, bubbles, maps, palette/vibes (if present), and image grid
+
+---
+
+## Metrics: exact calculation logic
+
+### 1) Interest Over Time
+
+Source: Google Trends `interest_over_time()`
+
+- Scale is Google-normalized 0-100 for the selected timeframe
+- The chart plots this series directly
+- No additional scaling is applied in app logic
+
+### 2) Trend Terms Bubble Score
+
+Source: Google Trends `related_queries()` top + rising entries
+
+- Terms are collected from the first available bucket for the query
+- Duplicate terms are removed
+- Display limit is 10
+
+Score handling:
+
+- If values are numeric: use those numeric values
+- If some are missing: fill missing with the median numeric value
+- If all are non-numeric (for example breakout-style labels):
+  fallback score by rank with
+  `score_i = max(10, (N - i) * 10)` for sorted index `i`
+
+Bubble sizing pipeline:
+
+- Normalize score:
+  `norm = (score - min_score) / max(max_score - min_score, 1.0)`
+- Radius used for packing and rendering:
+  `r = 0.26 + norm^0.65 * 0.34`
+- Packed layout:
+  iterative collision resolution + center gravity for compact clustering
+
+Color encoding:
+
+- Monochrome blue hue
+- Higher score => lighter blue (higher lightness)
+
+### 3) Momentum Score
+
+Implemented in `data_sources/google_trends.py::compute_trend_momentum`.
+
+Given a single trend series:
+
+- `recent_avg`:
+  mean of last 8 points (or full mean if fewer than 8 points)
+
+- `historical_avg`:
+  - if length >= 52: mean of points `[-52:-8]`
+  - else if length > 8: mean of points `[:-8]`
+  - else: mean of full series
+
+- Raw momentum:
+  `raw = (recent_avg - historical_avg) / (historical_avg + 1e-9)`
+
+- Clipped momentum:
+  `momentum = clip(raw, -1.0, 1.0)`
+
+Direction thresholds:
+
+- `rising` if momentum > 0.1
+- `falling` if momentum < -0.1
+- `stable` otherwise
+
+Dashboard also shows:
+
+- recent interest average (8-week)
+- historical baseline
+- delta = `recent_avg - historical_avg`
+
+### 4) Geographic Interest
+
+Source: Google Trends `interest_by_region(resolution="COUNTRY")`
+
+- Uses country-level trend values (0-100)
+- Globe map colors by interest value
+- Word cloud uses the same values as frequencies
+  (larger word = higher interest)
+
+### 5) Image Verification Metric
+
+For displayed images:
+
+- `verified_count = sum(image.verified == True)`
+- Caption shown as:
+  - `X images · Y verified by Groq Vision` if any verified
+  - otherwise `X trend-aligned images from Pinterest`
+
+Verification path:
+
+- URL upgraded to higher Pinterest resolution where possible
+- Image downloaded
+- Groq vision returns strict JSON relevance + caption
+- On failure, image is retained as unverified fallback
+
+### 6) AI-generated Editorial Fields
+
+Generated by `generate_dashboard_copy()` in `backend/ai_analyzer.py`:
+
+- `headline`
+- `summary`
+- `microcopy`
+- `normalized_phrase`
+
+If LLM fails/unavailable, deterministic fallback text is generated from filters + terms.
+
+Note on palette/vibes:
+
+- UI expects optional keys like `dominant_palette` and `aesthetic_vibes`
+- These sections render only if such keys are present in returned payload
+
+---
+
+## Current project structure
+
+```text
 FashionGpt_Studio/
-├── app.py                          # Streamlit frontend
-├── server.py                       # Flask API backend
-├── run_customer_analysis.py        # Batch customer intelligence pipeline
+├── app.py                          # Streamlit dashboard
+├── db.py                           # SQLite cache helpers
+├── ui_components.py                # Reusable UI renderers (palette, vibes)
+├── requirements.txt
+├── .env.example
 │
 ├── backend/
-│   ├── orchestrator.py             # Scrape → analyse → score → persist
-│   ├── ai_analyzer.py              # Groq LLM brand analysis
-│   └── llm_config.py               # LLM model/prompt config
-│
-├── scrapers/
-│   ├── pinterest_scraper.py
-│   ├── zara_scraper.py
-│   ├── uniqlo_scraper.py
-│   └── vogue_scraper.py
+│   ├── ai_analyzer.py              # LLM copy + image verification + analysis helpers
+│   └── llm_config.py               # Groq configuration and call wrappers
 │
 ├── data_sources/
-│   ├── google_trends.py            # pytrends wrapper + momentum scorer
-│   └── hm_loader.py                # H&M Kaggle dataset loader
+│   └── google_trends.py            # pytrends fetchers + momentum computation
 │
-├── analytics/
-│   ├── trend_scorer.py             # Trend Velocity Index (TVI)
-│   ├── trend_forecaster.py         # Prophet time-series forecasting
-│   ├── statistical_tests.py        # Mann-Kendall + t-tests
-│   ├── rfm.py                      # Recency / Frequency / Monetary
-│   ├── segmentation.py             # K-Means clustering on RFM
-│   ├── churn_labeller.py           # Implicit churn labelling
-│   ├── survival_analysis.py        # Kaplan-Meier + Cox PH (lifelines)
-│   ├── clv.py                      # BG/NBD + Gamma-Gamma CLV (lifetimes)
-│   ├── embeddings.py               # Sentence-transformer item embeddings
-│   ├── recommender.py              # Collaborative filtering (cornac MF)
-│   └── causal_analysis.py          # Propensity score matching
-│
-├── database/
-│   ├── schema.sql                  # DuckDB table definitions
-│   └── db_manager.py               # DatabaseManager context-manager class
-│
-├── observability/
-│   ├── mlflow_tracker.py           # MLflow experiment logging helpers
-│   └── data_validators.py          # Pandera DataFrame schemas
-│
-├── pages/
-│   └── analytics_dashboard.py      # Streamlit analytics page (reads DuckDB)
+├── scrapers/
+│   └── pinterest_scraper.py        # Selenium Pinterest scraper
 │
 ├── data/
-│   └── hm/                         # H&M Kaggle CSVs (not committed)
+│   └── hm/
+│       ├── articles.csv
+│       └── transactions_train.csv
 │
-├── outputs/                        # Generated reports (not committed)
-├── requirements.txt
-└── .env                            # API keys (not committed)
+└── outputs/                        # cache DB + temporary scrape outputs
 ```
 
 ---
 
 ## Setup
 
-### 1. Install dependencies
+### 1) Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-> **Windows / Python 3.13 note:** `implicit` and `scikit-survival` are replaced by `cornac` and `lifelines` respectively — both install without C++ build tools.
+### 2) Configure environment
 
-### 2. API keys
-
-Create a `.env` file (or set environment variables):
+Copy `.env.example` to `.env` and set:
 
 ```env
-GROQ_API_KEY=gsk_...
+GROQ_API_KEY=your-groq-api-key-here
 ```
 
-Groq is free — get a key at [console.groq.com](https://console.groq.com).  
+Optional overrides:
 
-### 3. (Optional) H&M dataset
-
-Required only for the customer intelligence pipeline. Download from Kaggle:
-
-```
-https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations/data
+```env
+GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_VISION_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
 ```
 
-Place these three files in `data/hm/`:
+### 3) Run app
 
-```
-data/hm/articles.csv
-data/hm/customers.csv
-data/hm/transactions_train.csv
+```bash
+streamlit run app.py
 ```
 
 ---
 
-## Running the app
+## Operational notes
 
-### Live trend dashboard
-
-```bash
-# Terminal 1 — Flask API
-python server.py
-
-# Terminal 2 — Streamlit UI
-python app.py
-```
-
-Open [http://localhost:8501](http://localhost:8501).
-
-### Customer intelligence pipeline
-
-Run once (or periodically) to process H&M data and populate DuckDB:
-
-```bash
-# Windows PowerShell
-$env:PYTHONUTF8="1"; python -u run_customer_analysis.py
-
-# Smaller sample for testing
-$env:PYTHONUTF8="1"; python -u run_customer_analysis.py --sample 10000
-```
-
-Default sample: 50,000 customers (~5–6 min on a laptop).
-
-### Analytics dashboard
-
-```bash
-streamlit run pages/analytics_dashboard.py
-```
-
-Or navigate to it from the Streamlit sidebar after launching `app.py` (multi-page app).
-
-### MLflow experiment UI
-
-```bash
-mlflow ui
-```
-
-Open [http://localhost:5000](http://localhost:5000).
+- Refresh button clears both trend and image cache tables
+- pytrends can rate-limit or return sparse values for niche queries
+- Selenium scraping quality depends on Pinterest DOM/network behavior
+- If Groq is unavailable, trend analytics still run; AI copy/vision gracefully degrade
 
 ---
 
-## Analytics modules
+## Roadmap ideas
 
-| Module | Algorithm | Output |
-|---|---|---|
-| `trend_scorer.py` | Weighted composite of Google / social / retail scores | Trend Velocity Index (0–100) + confidence label |
-| `trend_forecaster.py` | Facebook Prophet | 30-day forecast + trend direction |
-| `statistical_tests.py` | Mann-Kendall, Welch t-test | Trend significance p-values |
-| `rfm.py` | Quantile scoring | Recency / Frequency / Monetary scores + 8 segment labels |
-| `segmentation.py` | K-Means, silhouette optimisation | Optimal K, cluster profiles + names |
-| `churn_labeller.py` | 90th-percentile gap threshold | Binary churn flag per customer |
-| `survival_analysis.py` | Kaplan-Meier + Cox PH (`lifelines`) | Median survival, hazard ratios, concordance |
-| `clv.py` | BG/NBD + Gamma-Gamma (`lifetimes`) | 12-month predicted CLV per customer |
-| `embeddings.py` | `all-MiniLM-L6-v2` (sentence-transformers) | 384-dim item embeddings + cosine similarity |
-| `recommender.py` | Matrix Factorisation (`cornac`) | Top-N item recommendations per user |
-| `causal_analysis.py` | Propensity Score Matching (logistic regression) | Average Treatment Effect (ATE) |
-
----
-
-## Database
-
-DuckDB file: `outputs/fashion_intelligence.duckdb`
-
-| Table | Contents |
-|---|---|
-| `trend_snapshots` | Raw scrape snapshots per query/source |
-| `trend_scores` | Computed TVI scores per query |
-| `fashion_items` | Individual scraped items |
-| `google_trends_data` | pytrends time-series |
-| `customer_segments` | RFM + cluster + churn + CLV per customer |
-| `model_registry` | Logged model metadata |
-
----
-
-## Environment notes
-
-| Item | Value |
-|---|---|
-| Python | 3.13.5 |
-| OS tested | Windows 10 (PowerShell) |
-| `implicit` → | `cornac>=1.18.0` (no MSVC wheels for Python 3.13) |
-| `scikit-survival` → | `lifelines` (ecos dependency requires MSVC) |
-| MLflow backend | SQLite (`mlruns/mlflow.db`) |
+- Persist historical snapshots for query-level trend comparisons over sessions
+- Add test coverage for momentum and bubble-score preprocessing
+- Add explicit confidence calibration for AI-generated optional fields
