@@ -1,8 +1,8 @@
 # Retail Trend Intelligence Platform
 
-Built a real-time trend momentum detection system for fashion retail, aggregating Google Trends signals and social media imagery to classify product categories as rising, stable, or falling — applicable to trend-driven inventory and assortment planning at fashion retailers.
+Built a real-time trend momentum detection system for fashion retail, aggregating Google Trends signals and social media imagery to classify product categories as rising, stable, or falling — applicable to trend-driven inventory and assortment planning at retailers.
 
-The system computes a directional momentum score for any fashion query, surfaces regionally segmented demand signals across 200+ countries, and ranks visual references by a composite Fashion Relevance Trend Score — giving buyers and planners a single interface to move from search to decision.
+The system computes a directional momentum score for any fashion query, surfaces regionally segmented demand signals across 200+ countries, and ranks visual references by a composite Relevance Trend Score — giving buyers and planners a single interface to move from search to decision.
 
 ---
 
@@ -21,13 +21,14 @@ The system computes a directional momentum score for any fashion query, surfaces
 ### Core capabilities
 
 - Live Google Trends analysis for a user-generated fashion query
-- Trend momentum scoring with directional classification
+- Trend momentum scoring with directional classification (rising / stable / falling)
 - Packed bubble chart for related trend terms (monochrome, size by score)
 - Regional interest visualization (interactive globe + word cloud)
 - Pinterest image scraping, deduplication, and relevance verification
 - Groq LLM dashboard copy generation (cached per search phrase, refreshed on demand)
 - Fashion Relevance Trend Score for ranking images before display
 - Local SQLite caching for trend data and image metadata
+- Signal validation backtest against Pinterest Predicts 2024–2026 labeled dataset
 
 ### Tech stack
 
@@ -259,15 +260,45 @@ If LLM fails/unavailable, deterministic fallback text is generated from filters 
 
 ---
 
+## Signal validation
+
+The momentum scorer was backtested against Pinterest Predicts 2024–2026 — an independently labeled dataset of fashion trend predictions with confirmed/denied ground truth labels.
+
+**Methodology:** For each query, the full Google Trends time series was pulled and `compute_trend_momentum` was evaluated at every week of the predicted year using only data available up to that point (no lookahead). The first week the scorer crossed the rising threshold (momentum > 0.1) was recorded. Lead time was measured from that date to the actual peak interest week in the raw series.
+
+**Results (21 evaluable queries):**
+
+| Metric | Value |
+|---|---|
+| Precision | 0.69 |
+| Recall | 0.56 |
+| F1 | 0.62 |
+| Mean lead time | 19.4 weeks |
+| Median lead time | 12.9 weeks |
+| Flagged before peak | 13 / 13 rising queries |
+
+The scorer correctly identified 9 of 16 confirmed rising trends and flagged none of them after their peak — all rising signals fired ahead of the actual interest peak. 11 of 32 queries returned no Google Trends data (rate-limiting or query too niche) and were excluded.
+
+Results are surfaced in the app under the **📊 Signal Validation** tab.
+
+To regenerate:
+
+```bash
+python -m backtest.run_backtest
+```
+
+---
+
 ## Current project structure
 
 ```text
 FashionGpt_Studio/
-├── app.py                          # Streamlit dashboard
+├── app.py                          # Streamlit dashboard (Trend Explorer + Signal Validation tabs)
 ├── db.py                           # SQLite cache helpers
-├── ui_components.py                # UI component library (confidence badges)
+├── ui_components.py                # UI component library
 ├── requirements.txt
 ├── .env.example
+├── pinterest_predicts_fashion_labeled.csv   # Ground truth labels for backtest
 │
 ├── backend/
 │   ├── ai_analyzer.py              # LLM copy generation + image verification
@@ -279,6 +310,16 @@ FashionGpt_Studio/
 │
 ├── scrapers/
 │   └── pinterest_scraper.py        # Selenium Pinterest scraper
+│
+├── backtest/
+│   ├── fetch_trends.py             # Batch-fetch historical Trends series
+│   ├── sliding_window_scorer.py    # Weekly rolling momentum evaluation
+│   ├── compute_metrics.py          # Confusion matrix, precision/recall, lead times
+│   ├── visualize.py                # Spaghetti chart + lead time bar chart
+│   ├── run_backtest.py             # Orchestrator — runs all steps in order
+│   └── data/                       # raw/ and scored/ CSVs per query
+│
+├── backtest/results/               # metrics.csv, summary.txt, PNG charts
 │
 └── outputs/                        # cache DB + temporary scrape outputs
 ```
