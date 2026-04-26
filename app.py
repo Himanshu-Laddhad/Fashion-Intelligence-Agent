@@ -1,6 +1,7 @@
 """Fashion Intelligence — Trend Explorer."""
 
 import asyncio
+import math
 import re
 import sys
 from pathlib import Path
@@ -16,6 +17,10 @@ import db
 from backend.ai_analyzer import generate_dashboard_copy, verify_and_caption_images
 from data_sources.google_trends import compute_trend_momentum
 from scrapers.pinterest_scraper import scrape_pinterest_optimized
+from ui_components import (
+    render_color_palette,
+    render_vibe_gallery,
+)
 
 
 # ── Page config ───────────────────────────────────────────────────────────────
@@ -24,7 +29,6 @@ st.set_page_config(
     page_title="Fashion Trend Explorer",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="collapsed",
 )
 
 
@@ -193,6 +197,148 @@ def _collect_trend_terms(related_queries: dict, query: str, limit: int = 10) -> 
     return trend_df
 
 
+def _build_trend_bubble_figure(trend_terms_df: pd.DataFrame) -> go.Figure | None:
+    """Build a compact monochromatic packed-bubble chart for trend terms."""
+    if trend_terms_df is None or trend_terms_df.empty:
+        return None
+
+    bubble_df = trend_terms_df.copy()
+    bubble_df["score"] = pd.to_numeric(bubble_df.get("Value"), errors="coerce")
+
+    # If Google returns non-numeric values (e.g. "Breakout"), keep a usable visual ranking.
+    if bubble_df["score"].isna().all():
+        bubble_df["score"] = [max(10, (len(bubble_df) - i) * 10) for i in range(len(bubble_df))]
+    else:
+        bubble_df["score"] = bubble_df["score"].fillna(bubble_df["score"].median())
+
+    bubble_df = bubble_df.sort_values("score", ascending=False).reset_index(drop=True)
+    if bubble_df.empty:
+        return None
+
+    min_score = float(bubble_df["score"].min())
+    max_score = float(bubble_df["score"].max())
+    score_span = max(max_score - min_score, 1.0)
+
+    def _norm(v: float) -> float:
+        return (float(v) - min_score) / score_span
+
+    def _bubble_label(term: str, score: float) -> str:
+        text = str(term).strip()
+        if len(text) > 20:
+            text = text[:17] + "..."
+        words = text.split()
+        if len(words) >= 2 and len(text) > 11:
+            split_at = len(words) // 2
+            text = " ".join(words[:split_at]) + "<br>" + " ".join(words[split_at:])
+        return f"{text}<br><b>{int(round(score))}</b>"
+
+    bubbles = []
+    for idx, row in bubble_df.iterrows():
+        score = float(row["score"])
+        n = _norm(score)
+        radius = 0.26 + (n ** 0.65) * 0.34
+
+        if idx == 0:
+            x, y = 0.0, 0.0
+        else:
+            angle = idx * 2.3999632297
+            seed_radius = 0.12 * idx
+            x = seed_radius * math.cos(angle)
+            y = seed_radius * math.sin(angle)
+
+        bubbles.append(
+            {
+                "trend": str(row["Trend"]),
+                "score": score,
+                "norm": n,
+                "r": radius,
+                "x": x,
+                "y": y,
+            }
+        )
+
+    # Tight circle packing with center gravity for a compact cluster.
+    for _ in range(220):
+        moved = False
+        for i in range(len(bubbles)):
+            for j in range(i + 1, len(bubbles)):
+                bi = bubbles[i]
+                bj = bubbles[j]
+                dx = bj["x"] - bi["x"]
+                dy = bj["y"] - bi["y"]
+                dist = math.sqrt(dx * dx + dy * dy) or 1e-6
+                min_dist = bi["r"] + bj["r"] + 0.012
+                if dist < min_dist:
+                    overlap = min_dist - dist
+                    ux = dx / dist
+                    uy = dy / dist
+                    shift = overlap * 0.52
+                    bi["x"] -= ux * shift
+                    bi["y"] -= uy * shift
+                    bj["x"] += ux * shift
+                    bj["y"] += uy * shift
+                    moved = True
+
+        for b in bubbles:
+            b["x"] *= 0.986
+            b["y"] *= 0.986
+
+        if not moved:
+            break
+
+    fig_bubbles = go.Figure()
+
+    for b in bubbles:
+        # Monochromatic palette: one hue (blue), varied lightness by score.
+        lightness = 30 + b["norm"] * 38
+        fill = f"hsl(212, 72%, {lightness:.1f}%)"
+
+        fig_bubbles.add_shape(
+            type="circle",
+            xref="x",
+            yref="y",
+            x0=b["x"] - b["r"],
+            y0=b["y"] - b["r"],
+            x1=b["x"] + b["r"],
+            y1=b["y"] + b["r"],
+            line=dict(color="rgba(188,210,255,0.55)", width=1.5),
+            fillcolor=fill,
+            opacity=0.93,
+        )
+        fig_bubbles.add_annotation(
+            x=b["x"],
+            y=b["y"],
+            text=_bubble_label(b["trend"], b["score"]),
+            showarrow=False,
+            align="center",
+            font=dict(color="white", size=10 + int(b["norm"] * 5)),
+        )
+
+    fig_bubbles.add_trace(
+        go.Scatter(
+            x=[b["x"] for b in bubbles],
+            y=[b["y"] for b in bubbles],
+            mode="markers",
+            marker=dict(size=2, color="rgba(0,0,0,0)"),
+            customdata=[(b["trend"], b["score"]) for b in bubbles],
+            hovertemplate="<b>%{customdata[0]}</b><br>Score: %{customdata[1]:.0f}<extra></extra>",
+            showlegend=False,
+        )
+    )
+
+    extent = max(max(abs(b["x"]) + b["r"], abs(b["y"]) + b["r"]) for b in bubbles) + 0.08
+    fig_bubbles.update_layout(
+        height=430,
+        margin=dict(l=10, r=10, t=8, b=8),
+        xaxis=dict(visible=False, range=[-extent, extent]),
+        yaxis=dict(visible=False, range=[-extent, extent]),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
+    fig_bubbles.update_yaxes(scaleanchor="x", scaleratio=1)
+    return fig_bubbles
+
+
 async def _scrape_and_verify(search_phrase: str, trend_terms: list[str]) -> list[dict]:
     """Scrape Pinterest images and verify with LLM."""
     queries = [search_phrase]
@@ -229,6 +375,7 @@ async def _scrape_and_verify(search_phrase: str, trend_terms: list[str]) -> list
 
 
 def _render_verified_grid(verified_images: list) -> None:
+    """Render verified image grid."""
     shown = [img for img in (verified_images or []) if img.get("url")]
     if not shown:
         st.info("No relevant images found for this filter combination.")
@@ -259,7 +406,6 @@ def _render_verified_grid(verified_images: list) -> None:
 
 if "trend_refresh_nonce" not in st.session_state:
     st.session_state["trend_refresh_nonce"] = 0
-
 
 # ── Header ────────────────────────────────────────────────────────────────────
 
@@ -343,22 +489,34 @@ st.divider()
 
 st.subheader("📈 Interest Over Time")
 
-if ts_df is not None and not ts_df.empty and search_phrase in ts_df.columns:
-    plot_df = ts_df.drop(columns=["isPartial"], errors="ignore").reset_index()
-    x_col = next((c for c in plot_df.columns if c != search_phrase), plot_df.columns[0])
-    plot_df = plot_df.rename(columns={search_phrase: "Interest"})
-    fig = px.line(
-        plot_df, x=x_col, y="Interest",
-        title=f"Google Trends Interest — {timeframe_label}",
-        labels={x_col: "Date", "Interest": "Interest (0–100)"},
-    )
-    fig.update_layout(yaxis_range=[0, 100], height=400, hovermode="x unified")
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.info(
-        "No trend data returned. Google Trends may be rate-limiting. "
-        "Press **🔄 Refresh Trends** to try again."
-    )
+col_interest, col_bubbles = st.columns([3, 2], gap="large")
+
+with col_interest:
+    if ts_df is not None and not ts_df.empty and search_phrase in ts_df.columns:
+        plot_df = ts_df.drop(columns=["isPartial"], errors="ignore").reset_index()
+        x_col = next((c for c in plot_df.columns if c != search_phrase), plot_df.columns[0])
+        plot_df = plot_df.rename(columns={search_phrase: "Interest"})
+        fig = px.line(
+            plot_df, x=x_col, y="Interest",
+            title=f"Google Trends Interest — {timeframe_label}",
+            labels={x_col: "Date", "Interest": "Interest (0–100)"},
+        )
+        fig.update_layout(yaxis_range=[0, 100], height=430, hovermode="x unified")
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info(
+            "No trend data returned. Google Trends may be rate-limiting. "
+            "Press **🔄 Refresh Trends** to try again."
+        )
+
+with col_bubbles:
+    st.markdown("**Trend Bubbles**")
+    st.caption("Monochrome packed view · bubble size = score")
+    fig_bubbles_inline = _build_trend_bubble_figure(trend_terms_df)
+    if fig_bubbles_inline is not None:
+        st.plotly_chart(fig_bubbles_inline, use_container_width=True)
+    else:
+        st.info("No related trend terms available for bubble view.")
 
 st.divider()
 
@@ -446,7 +604,23 @@ else:
 st.divider()
 
 
-# ── 3. Geographic Interest ────────────────────────────────────────────────────
+# ── 3A. Trend Color Palette ───────────────────────────────────────────────────
+
+if dashboard_copy:
+    if dashboard_copy.get("dominant_palette"):
+        render_color_palette(dashboard_copy["dominant_palette"], "Trend Palette")
+
+
+# ── 3B. Aesthetic Vibes ───────────────────────────────────────────────────────
+
+if dashboard_copy:
+    vibes = dashboard_copy.get("aesthetic_vibes", [])
+    vibe_confidence = dashboard_copy.get("vibe_confidence", {})
+    if vibes:
+        render_vibe_gallery(vibes, vibe_confidence)
+
+
+# ── 3D. Geographic Interest ────────────────────────────────────────────────────
 
 st.subheader("🌍 Geographic Interest")
 
@@ -531,50 +705,6 @@ if region_df is not None and not region_df.empty:
                 st.caption(f"Word size = search interest · {len(freq)} countries")
 else:
     st.info("No regional data available for this filter combination.")
-
-st.divider()
-
-
-# ── 4. Current Trend Terms ────────────────────────────────────────────────────
-
-st.subheader("🔥 Current Trend Terms")
-st.caption("Top and rising Google Trends terms for the active fashion request")
-
-if trend_terms_df is not None and not trend_terms_df.empty:
-    rows_html = ""
-    for _, row in trend_terms_df.iterrows():
-        rank = int(row["Rank"])
-        trend = row["Trend"]
-        value = row.get("Value")
-        val_str = f"{int(value)}" if value is not None and not pd.isna(value) else "—"
-        row_bg = "rgba(255,255,255,0.04)" if rank % 2 == 0 else "transparent"
-        rows_html += f"""
-        <tr style="background:{row_bg};">
-            <td style="padding:0.65rem 1.1rem;color:#888;font-size:0.82rem;width:3rem;">{rank}</td>
-            <td style="padding:0.65rem 1.1rem;color:#e0e0e0;font-weight:500;">{trend}</td>
-            <td style="padding:0.65rem 1.1rem;color:#667eea;text-align:right;font-variant-numeric:tabular-nums;width:5rem;">{val_str}</td>
-        </tr>"""
-
-    st.markdown(f"""
-    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(102,126,234,0.25);
-                border-radius:12px;overflow:hidden;margin-top:0.5rem;">
-        <table style="width:100%;border-collapse:collapse;">
-            <thead>
-                <tr style="border-bottom:1px solid rgba(102,126,234,0.3);background:rgba(102,126,234,0.08);">
-                    <th style="padding:0.8rem 1.1rem;color:#667eea;text-align:left;
-                               font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;">#</th>
-                    <th style="padding:0.8rem 1.1rem;color:#667eea;text-align:left;
-                               font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;">Trend</th>
-                    <th style="padding:0.8rem 1.1rem;color:#667eea;text-align:right;
-                               font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;">Score</th>
-                </tr>
-            </thead>
-            <tbody>{rows_html}</tbody>
-        </table>
-    </div>
-    """, unsafe_allow_html=True)
-else:
-    st.info("No related trend terms returned by Google Trends for this request.")
 
 st.divider()
 
