@@ -1,0 +1,33 @@
+
+=== Pinterest Predicts Backtest — Momentum Scorer Validation ===
+
+Queries evaluated : 31 / 32
+Queries skipped   : 1 (no Trends data returned)
+
+Confusion matrix (all years):
+  TP (confirmed + flagged rising) : 13
+  TN (not confirmed + not flagged): 3
+  FP (not confirmed + flagged)    : 7
+  FN (confirmed + not flagged)    : 8
+
+Classification metrics:
+  Precision : 0.65
+  Recall    : 0.62
+  F1        : 0.63
+  Accuracy  : 0.52
+
+Lead time vs actual peak week (confirmed-rising queries only):
+  Flagged before peak : 20 queries
+  Flagged after peak  : 0 queries (lagging signal)
+  Mean lead time      : 14.7 weeks
+  Median lead time    : 8.7 weeks
+
+Per-year breakdown:
+                   n   tp   tn   fp   fn  accuracy
+predicted_year                                    
+2024            12.0  5.0  1.0  2.0  4.0  0.500000
+2025             8.0  3.0  0.0  1.0  4.0  0.375000
+2026            11.0  5.0  2.0  4.0  0.0  0.636364
+
+Note: 2026 rows use April 2026 as data cutoff. Lead times are lower bounds.
+      Lead time is measured from first 'rising' flag to actual peak interest week.

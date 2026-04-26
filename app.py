@@ -416,6 +416,97 @@ def _render_verified_grid(verified_images: list) -> None:
                     st.caption(f"Fashion Score: {float(score):.1f}/100")
 
 
+# ── Validation tab ────────────────────────────────────────────────────────────
+
+def _render_validation_tab() -> None:
+    RESULTS_DIR = Path("backtest/results")
+    metrics_path = RESULTS_DIR / "metrics.csv"
+    summary_path = RESULTS_DIR / "summary.txt"
+    spaghetti_path = RESULTS_DIR / "spaghetti_chart.png"
+    lead_time_path = RESULTS_DIR / "lead_time_chart.png"
+
+    if not metrics_path.exists():
+        st.info("No backtest results found. Run `python -m backtest.run_backtest` first.")
+        return
+
+    metrics_df = pd.read_csv(metrics_path)
+    metrics_df["confirmed"] = metrics_df["confirmed"].astype(bool)
+    metrics_df["data_available"] = metrics_df["data_available"].astype(bool)
+
+    available = metrics_df[metrics_df["data_available"]]
+    tp = int(available["tp"].sum())
+    tn = int(available["tn"].sum())
+    fp = int(available["fp"].sum())
+    fn = int(available["fn"].sum())
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall    = tp / (tp + fn) if (tp + fn) > 0 else 0
+    f1        = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0
+    accuracy  = (tp + tn) / len(available) if len(available) > 0 else 0
+
+    early = available[available["scorer_flagged_rising"] & available["lead_weeks"].notna() & (available["lead_weeks"] >= 0)]
+    avg_lead    = early["lead_weeks"].mean() if not early.empty else 0
+    median_lead = early["lead_weeks"].median() if not early.empty else 0
+
+    st.subheader("Momentum Signal — Pinterest Predicts Backtest")
+    st.caption(
+        f"Validated against {len(available)} fashion trend queries from Pinterest Predicts "
+        f"2024–2026 · ground truth: Pinterest retrospective labels"
+    )
+
+    st.markdown("#### Classification metrics")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Precision", f"{precision:.2f}", help="Of trends flagged rising, how many were confirmed")
+    m2.metric("Recall",    f"{recall:.2f}",    help="Of confirmed rising trends, how many were flagged")
+    m3.metric("F1",        f"{f1:.2f}")
+    m4.metric("Accuracy",  f"{accuracy:.2f}")
+
+    st.markdown("#### Lead time — confirmed rising trends")
+    l1, l2, l3 = st.columns(3)
+    l1.metric("Mean lead time",   f"{avg_lead:.1f} weeks",    help="Weeks before actual peak the scorer first flagged 'rising'")
+    l2.metric("Median lead time", f"{median_lead:.1f} weeks")
+    l3.metric("Flagged before peak", f"{len(early)} / {int(available['confirmed'].sum())} confirmed")
+
+    st.markdown("#### Confusion matrix")
+    cm_col, _ = st.columns([1, 2])
+    with cm_col:
+        st.dataframe(
+            pd.DataFrame(
+                {"Predicted Rising": [tp, fp], "Predicted Not Rising": [fn, tn]},
+                index=["Actually Rising", "Actually Not Rising"],
+            ),
+            use_container_width=True,
+        )
+
+    st.divider()
+    st.markdown("#### Momentum score over time — confirmed rising trends (2024–2025)")
+    if spaghetti_path.exists():
+        st.image(str(spaghetti_path), use_container_width=True)
+        st.caption("Each line = one confirmed rising trend · dashed line = rising threshold (0.1) · x-axis = weeks relative to peak")
+    else:
+        st.info("Spaghetti chart not found — run the visualize step.")
+
+    st.markdown("#### Lead time by query")
+    if lead_time_path.exists():
+        st.image(str(lead_time_path), use_container_width=True)
+        st.caption("Bar length = weeks before actual interest peak the scorer first flagged 'rising'")
+    else:
+        st.info("Lead time chart not found — run the visualize step.")
+
+    st.divider()
+    st.markdown("#### Per-query results")
+    display_cols = ["query", "predicted_year", "confirmed", "scorer_flagged_rising", "peak_date", "first_rising_date", "lead_weeks"]
+    display_cols = [c for c in display_cols if c in metrics_df.columns]
+    st.dataframe(
+        metrics_df[display_cols].sort_values(["predicted_year", "confirmed"], ascending=[True, False]),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    if summary_path.exists():
+        with st.expander("Raw summary output"):
+            st.code(summary_path.read_text(encoding="utf-8", errors="replace"))
+
+
 # ── Session state ─────────────────────────────────────────────────────────────
 
 if "trend_refresh_nonce" not in st.session_state:
@@ -468,28 +559,18 @@ search_phrase = _build_search_phrase(filters)
 
 st.markdown(f"**Search phrase:** {search_phrase}")
 
+tab_explorer, tab_validation = st.tabs(["📈 Trend Explorer", "📊 Signal Validation"])
 
-# ── Fetch or load trend data ──────────────────────────────────────────────────
+with tab_validation:
+    _render_validation_tab()
 
-if db.has_trend(search_phrase, timeframe):
-    ts_df, region_df, trend_terms_df = db.load_trend(search_phrase, timeframe)
-    trend_terms = trend_terms_df["Trend"].tolist() if not trend_terms_df.empty else []
-    trend_term_scores = (
-        {
-            str(row["Trend"]): float(row["Value"])
-            for _, row in trend_terms_df.iterrows()
-            if row.get("Trend") and row.get("Value") is not None and not pd.isna(row.get("Value"))
-        }
-        if trend_terms_df is not None and not trend_terms_df.empty
-        else {}
-    )
-else:
-    with st.spinner(f"Fetching live trends for '{search_phrase}'…"):
-        ts_df          = _fetch_interest_over_time(search_phrase, timeframe)
-        region_df      = _fetch_region_interest(search_phrase, timeframe)
-        related        = _fetch_related_queries(search_phrase)
-        trend_terms_df = _collect_trend_terms(related, search_phrase, limit=10)
-        trend_terms    = trend_terms_df["Trend"].tolist() if not trend_terms_df.empty else []
+with tab_explorer:
+
+    # ── Fetch or load trend data ──────────────────────────────────────────────
+
+    if db.has_trend(search_phrase, timeframe):
+        ts_df, region_df, trend_terms_df = db.load_trend(search_phrase, timeframe)
+        trend_terms = trend_terms_df["Trend"].tolist() if not trend_terms_df.empty else []
         trend_term_scores = (
             {
                 str(row["Trend"]): float(row["Value"])
@@ -499,249 +580,261 @@ else:
             if trend_terms_df is not None and not trend_terms_df.empty
             else {}
         )
-        db.save_trend(search_phrase, timeframe, ts_df, region_df, trend_terms_df)
-
-_copy_key = f"{search_phrase}:{st.session_state['trend_refresh_nonce']}"
-if st.session_state.get("_copy_cache_key") != _copy_key:
-    st.session_state["dashboard_copy"] = _run_async(
-        generate_dashboard_copy(filters=filters, search_phrase=search_phrase, trend_terms=trend_terms)
-    )
-    st.session_state["_copy_cache_key"] = _copy_key
-dashboard_copy = st.session_state["dashboard_copy"]
-
-copy_col, metric_col = st.columns([3, 1])
-with copy_col:
-    st.subheader(dashboard_copy.get("headline", "Live fashion trends"))
-    st.markdown(dashboard_copy.get("summary", "Live fashion trend data is ready."))
-    if dashboard_copy.get("microcopy"):
-        st.caption(dashboard_copy["microcopy"])
-    if dashboard_copy.get("normalized_phrase"):
-        st.caption(f"Normalized phrase: {dashboard_copy['normalized_phrase']}")
-
-st.divider()
-
-
-# ── 1. Interest Over Time ─────────────────────────────────────────────────────
-
-st.subheader("📈 Interest Over Time")
-
-col_interest, col_bubbles = st.columns([3, 2], gap="large")
-
-with col_interest:
-    if ts_df is not None and not ts_df.empty and search_phrase in ts_df.columns:
-        plot_df = ts_df.drop(columns=["isPartial"], errors="ignore").reset_index()
-        x_col = next((c for c in plot_df.columns if c != search_phrase), plot_df.columns[0])
-        plot_df = plot_df.rename(columns={search_phrase: "Interest"})
-        fig = px.line(
-            plot_df, x=x_col, y="Interest",
-            title=f"Google Trends Interest — {timeframe_label}",
-            labels={x_col: "Date", "Interest": "Interest (0–100)"},
-        )
-        fig.update_layout(yaxis_range=[0, 100], height=430, hovermode="x unified")
-        st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info(
-            "No trend data returned. Google Trends may be rate-limiting. "
-            "Press **🔄 Refresh Trends** to try again."
+        with st.spinner(f"Fetching live trends for '{search_phrase}'…"):
+            ts_df          = _fetch_interest_over_time(search_phrase, timeframe)
+            region_df      = _fetch_region_interest(search_phrase, timeframe)
+            related        = _fetch_related_queries(search_phrase)
+            trend_terms_df = _collect_trend_terms(related, search_phrase, limit=10)
+            trend_terms    = trend_terms_df["Trend"].tolist() if not trend_terms_df.empty else []
+            trend_term_scores = (
+                {
+                    str(row["Trend"]): float(row["Value"])
+                    for _, row in trend_terms_df.iterrows()
+                    if row.get("Trend") and row.get("Value") is not None and not pd.isna(row.get("Value"))
+                }
+                if trend_terms_df is not None and not trend_terms_df.empty
+                else {}
+            )
+            db.save_trend(search_phrase, timeframe, ts_df, region_df, trend_terms_df)
+
+    _copy_key = f"{search_phrase}:{st.session_state['trend_refresh_nonce']}"
+    if st.session_state.get("_copy_cache_key") != _copy_key:
+        st.session_state["dashboard_copy"] = _run_async(
+            generate_dashboard_copy(filters=filters, search_phrase=search_phrase, trend_terms=trend_terms)
         )
+        st.session_state["_copy_cache_key"] = _copy_key
+    dashboard_copy = st.session_state["dashboard_copy"]
 
-with col_bubbles:
-    st.markdown("**Trend Bubbles**")
-    st.caption("Monochrome packed view · bubble size = score")
-    fig_bubbles_inline = _build_trend_bubble_figure(trend_terms_df)
-    if fig_bubbles_inline is not None:
-        st.plotly_chart(fig_bubbles_inline, use_container_width=True)
-    else:
-        st.info("No related trend terms available for bubble view.")
+    copy_col, metric_col = st.columns([3, 1])
+    with copy_col:
+        st.subheader(dashboard_copy.get("headline", "Live fashion trends"))
+        st.markdown(dashboard_copy.get("summary", "Live fashion trend data is ready."))
+        if dashboard_copy.get("microcopy"):
+            st.caption(dashboard_copy["microcopy"])
+        if dashboard_copy.get("normalized_phrase"):
+            st.caption(f"Normalized phrase: {dashboard_copy['normalized_phrase']}")
 
-st.divider()
+    st.divider()
 
+    # ── 1. Interest Over Time ─────────────────────────────────────────────────
 
-# ── 2. Momentum Scorecard ─────────────────────────────────────────────────────
+    st.subheader("📈 Interest Over Time")
 
-st.subheader("🚀 Trend Momentum")
+    col_interest, col_bubbles = st.columns([3, 2], gap="large")
 
-mom_df = _build_momentum_table(ts_df, search_phrase)
-if not mom_df.empty:
-    raw_momentum    = float(mom_df.iloc[0]["Momentum"])
-    direction_label = str(mom_df.iloc[0]["Direction"])
-    recent          = float(mom_df.iloc[0]["Recent Avg (0–100)"])
-    historical      = float(mom_df.iloc[0]["Historical Avg (0–100)"])
+    with col_interest:
+        if ts_df is not None and not ts_df.empty and search_phrase in ts_df.columns:
+            plot_df = ts_df.drop(columns=["isPartial"], errors="ignore").reset_index()
+            x_col = next((c for c in plot_df.columns if c != search_phrase), plot_df.columns[0])
+            plot_df = plot_df.rename(columns={search_phrase: "Interest"})
+            fig = px.line(
+                plot_df, x=x_col, y="Interest",
+                title=f"Google Trends Interest — {timeframe_label}",
+                labels={x_col: "Date", "Interest": "Interest (0–100)"},
+            )
+            fig.update_layout(yaxis_range=[0, 100], height=430, hovermode="x unified")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info(
+                "No trend data returned. Google Trends may be rate-limiting. "
+                "Press **🔄 Refresh Trends** to try again."
+            )
 
-    _dir_cfg = {
-        "Rising":  ("#2ecc71", "🟢 Rising"),
-        "Falling": ("#e74c3c", "🔴 Falling"),
-        "Stable":  ("#f39c12", "🟡 Stable"),
-    }
-    bar_color, direction_display = _dir_cfg.get(direction_label, ("#95a5a6", "⚪ Unknown"))
+    with col_bubbles:
+        st.markdown("**Trend Bubbles**")
+        st.caption("Monochrome packed view · bubble size = score")
+        fig_bubbles_inline = _build_trend_bubble_figure(trend_terms_df)
+        if fig_bubbles_inline is not None:
+            st.plotly_chart(fig_bubbles_inline, use_container_width=True)
+        else:
+            st.info("No related trend terms available for bubble view.")
 
-    fig_gauge = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=raw_momentum,
-        number={"valueformat": ".3f", "font": {"size": 56, "color": bar_color}},
-        title={
-            "text": "Momentum Score<br><span style='font-size:13px;color:#888'>−1 falling · 0 stable · +1 rising</span>",
-            "font": {"size": 15},
-        },
-        gauge={
-            "axis": {
-                "range": [-1, 1],
-                "tickvals": [-1, -0.5, 0, 0.5, 1],
-                "ticktext": ["−1", "−0.5", "0", "+0.5", "+1"],
-                "tickfont": {"color": "#aaa"},
+    st.divider()
+
+    # ── 2. Momentum Scorecard ─────────────────────────────────────────────────
+
+    st.subheader("🚀 Trend Momentum")
+
+    mom_df = _build_momentum_table(ts_df, search_phrase)
+    if not mom_df.empty:
+        raw_momentum    = float(mom_df.iloc[0]["Momentum"])
+        direction_label = str(mom_df.iloc[0]["Direction"])
+        recent          = float(mom_df.iloc[0]["Recent Avg (0–100)"])
+        historical      = float(mom_df.iloc[0]["Historical Avg (0–100)"])
+
+        _dir_cfg = {
+            "Rising":  ("#2ecc71", "🟢 Rising"),
+            "Falling": ("#e74c3c", "🔴 Falling"),
+            "Stable":  ("#f39c12", "🟡 Stable"),
+        }
+        bar_color, direction_display = _dir_cfg.get(direction_label, ("#95a5a6", "⚪ Unknown"))
+
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=raw_momentum,
+            number={"valueformat": ".3f", "font": {"size": 56, "color": bar_color}},
+            title={
+                "text": "Momentum Score<br><span style='font-size:13px;color:#888'>−1 falling · 0 stable · +1 rising</span>",
+                "font": {"size": 15},
             },
-            "bar": {"color": bar_color, "thickness": 0.28},
-            "bgcolor": "rgba(0,0,0,0)",
-            "borderwidth": 0,
-            "steps": [
-                {"range": [-1.0, -0.1], "color": "rgba(231,76,60,0.12)"},
-                {"range": [-0.1,  0.1], "color": "rgba(241,196,15,0.10)"},
-                {"range": [ 0.1,  1.0], "color": "rgba(46,204,113,0.12)"},
-            ],
-            "threshold": {"line": {"color": bar_color, "width": 3}, "thickness": 0.8, "value": raw_momentum},
-        },
-    ))
-    fig_gauge.update_layout(
-        height=280, margin=dict(l=30, r=30, t=50, b=10),
-        paper_bgcolor="rgba(0,0,0,0)", font_color="white",
-    )
-
-    col_gauge, col_stats = st.columns([2, 1])
-    with col_gauge:
-        st.plotly_chart(fig_gauge, use_container_width=True)
-    with col_stats:
-        st.metric("Direction", direction_display)
-        st.metric("Recent Interest (8-week avg)", f"{recent:.1f} / 100")
-        st.metric("Historical Baseline", f"{historical:.1f} / 100",
-                  delta=f"{recent - historical:+.1f} vs baseline")
-
-    if direction_label == "Rising":
-        insight = (
-            f"**{search_phrase.title()}** is gaining momentum. "
-            f"Recent interest ({recent:.0f}/100) is {recent - historical:.0f} pts above the "
-            f"historical baseline ({historical:.0f}/100) — a strengthening trend."
+            gauge={
+                "axis": {
+                    "range": [-1, 1],
+                    "tickvals": [-1, -0.5, 0, 0.5, 1],
+                    "ticktext": ["−1", "−0.5", "0", "+0.5", "+1"],
+                    "tickfont": {"color": "#aaa"},
+                },
+                "bar": {"color": bar_color, "thickness": 0.28},
+                "bgcolor": "rgba(0,0,0,0)",
+                "borderwidth": 0,
+                "steps": [
+                    {"range": [-1.0, -0.1], "color": "rgba(231,76,60,0.12)"},
+                    {"range": [-0.1,  0.1], "color": "rgba(241,196,15,0.10)"},
+                    {"range": [ 0.1,  1.0], "color": "rgba(46,204,113,0.12)"},
+                ],
+                "threshold": {"line": {"color": bar_color, "width": 3}, "thickness": 0.8, "value": raw_momentum},
+            },
+        ))
+        fig_gauge.update_layout(
+            height=280, margin=dict(l=30, r=30, t=50, b=10),
+            paper_bgcolor="rgba(0,0,0,0)", font_color="white",
         )
-    elif direction_label == "Falling":
-        insight = (
-            f"**{search_phrase.title()}** is losing steam. "
-            f"Recent interest ({recent:.0f}/100) dropped {historical - recent:.0f} pts below "
-            f"the historical baseline ({historical:.0f}/100). May be past peak."
-        )
+
+        col_gauge, col_stats = st.columns([2, 1])
+        with col_gauge:
+            st.plotly_chart(fig_gauge, use_container_width=True)
+        with col_stats:
+            st.metric("Direction", direction_display)
+            st.metric("Recent Interest (8-week avg)", f"{recent:.1f} / 100")
+            st.metric("Historical Baseline", f"{historical:.1f} / 100",
+                      delta=f"{recent - historical:+.1f} vs baseline")
+
+        if direction_label == "Rising":
+            insight = (
+                f"**{search_phrase.title()}** is gaining momentum. "
+                f"Recent interest ({recent:.0f}/100) is {recent - historical:.0f} pts above the "
+                f"historical baseline ({historical:.0f}/100) — a strengthening trend."
+            )
+        elif direction_label == "Falling":
+            insight = (
+                f"**{search_phrase.title()}** is losing steam. "
+                f"Recent interest ({recent:.0f}/100) dropped {historical - recent:.0f} pts below "
+                f"the historical baseline ({historical:.0f}/100). May be past peak."
+            )
+        else:
+            insight = (
+                f"**{search_phrase.title()}** is holding steady. "
+                f"Recent interest ({recent:.0f}/100) is close to the historical baseline "
+                f"({historical:.0f}/100) — no strong directional signal."
+            )
+        st.markdown(insight)
     else:
-        insight = (
-            f"**{search_phrase.title()}** is holding steady. "
-            f"Recent interest ({recent:.0f}/100) is close to the historical baseline "
-            f"({historical:.0f}/100) — no strong directional signal."
-        )
-    st.markdown(insight)
-else:
-    st.info("Momentum data unavailable — trend fetch required first.")
+        st.info("Momentum data unavailable — trend fetch required first.")
 
-st.divider()
+    st.divider()
 
+    # ── 3. Geographic Interest ────────────────────────────────────────────────
 
-# ── 3. Geographic Interest ────────────────────────────────────────────────────
+    st.subheader("🌍 Geographic Interest")
 
-st.subheader("🌍 Geographic Interest")
+    if region_df is not None and not region_df.empty:
+        region_df.columns = [c.lower() for c in region_df.columns]
+        value_col = next((c for c in region_df.columns if c != "geoname"), None)
 
-if region_df is not None and not region_df.empty:
-    region_df.columns = [c.lower() for c in region_df.columns]
-    value_col = next((c for c in region_df.columns if c != "geoname"), None)
+        if value_col:
+            active = region_df[region_df[value_col] > 0].copy()
+            freq = dict(zip(active["geoname"], active[value_col].astype(float)))
 
-    if value_col:
-        active = region_df[region_df[value_col] > 0].copy()
-        freq = dict(zip(active["geoname"], active[value_col].astype(float)))
+            if freq:
+                from wordcloud import WordCloud
+                import matplotlib.pyplot as plt
 
-        if freq:
-            from wordcloud import WordCloud
-            import matplotlib.pyplot as plt
+                col_globe, col_wc = st.columns(2, gap="medium")
 
-            col_globe, col_wc = st.columns(2, gap="medium")
+                with col_globe:
+                    fig_globe = go.Figure(data=go.Choropleth(
+                        locations=active["geoname"],
+                        z=active[value_col].astype(float),
+                        locationmode="country names",
+                        colorscale=[
+                            [0.0, "rgba(50, 10, 80, 0.3)"],
+                            [0.4, "rgba(120, 40, 160, 0.7)"],
+                            [1.0, "#c39bd3"],
+                        ],
+                        marker_line_color="rgba(180,180,220,0.25)",
+                        marker_line_width=0.5,
+                        colorbar=dict(
+                            title=dict(text="Interest", font=dict(color="#ccc")),
+                            thickness=10, len=0.55,
+                            tickfont=dict(color="#ccc"),
+                            bgcolor="rgba(0,0,0,0)", borderwidth=0,
+                        ),
+                        zmin=0, zmax=100,
+                    ))
+                    fig_globe.update_geos(
+                        projection_type="orthographic",
+                        showocean=True, oceancolor="rgb(12, 12, 28)",
+                        showland=True, landcolor="rgb(30, 30, 50)",
+                        showframe=False, showcountries=True,
+                        countrycolor="rgba(140, 140, 180, 0.35)",
+                        showcoastlines=True,
+                        coastlinecolor="rgba(140, 140, 180, 0.35)",
+                        bgcolor="rgba(0,0,0,0)",
+                        lataxis_showgrid=False, lonaxis_showgrid=False,
+                    )
+                    fig_globe.update_layout(
+                        title=dict(
+                            text=f"<b>{search_phrase}</b> — {timeframe_label}",
+                            font=dict(color="#ddd", size=13), x=0.5,
+                        ),
+                        geo=dict(bgcolor="rgba(0,0,0,0)"),
+                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                        height=420, margin=dict(l=0, r=0, t=36, b=0),
+                        font_color="white", dragmode="orbit",
+                    )
+                    st.plotly_chart(fig_globe, use_container_width=True)
+                    st.caption("Drag to rotate · Scroll to zoom")
 
-            with col_globe:
-                fig_globe = go.Figure(data=go.Choropleth(
-                    locations=active["geoname"],
-                    z=active[value_col].astype(float),
-                    locationmode="country names",
-                    colorscale=[
-                        [0.0, "rgba(50, 10, 80, 0.3)"],
-                        [0.4, "rgba(120, 40, 160, 0.7)"],
-                        [1.0, "#c39bd3"],
-                    ],
-                    marker_line_color="rgba(180,180,220,0.25)",
-                    marker_line_width=0.5,
-                    colorbar=dict(
-                        title=dict(text="Interest", font=dict(color="#ccc")),
-                        thickness=10, len=0.55,
-                        tickfont=dict(color="#ccc"),
-                        bgcolor="rgba(0,0,0,0)", borderwidth=0,
-                    ),
-                    zmin=0, zmax=100,
-                ))
-                fig_globe.update_geos(
-                    projection_type="orthographic",
-                    showocean=True, oceancolor="rgb(12, 12, 28)",
-                    showland=True, landcolor="rgb(30, 30, 50)",
-                    showframe=False, showcountries=True,
-                    countrycolor="rgba(140, 140, 180, 0.35)",
-                    showcoastlines=True,
-                    coastlinecolor="rgba(140, 140, 180, 0.35)",
-                    bgcolor="rgba(0,0,0,0)",
-                    lataxis_showgrid=False, lonaxis_showgrid=False,
-                )
-                fig_globe.update_layout(
-                    title=dict(
-                        text=f"<b>{search_phrase}</b> — {timeframe_label}",
-                        font=dict(color="#ddd", size=13), x=0.5,
-                    ),
-                    geo=dict(bgcolor="rgba(0,0,0,0)"),
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    height=420, margin=dict(l=0, r=0, t=36, b=0),
-                    font_color="white", dragmode="orbit",
-                )
-                st.plotly_chart(fig_globe, use_container_width=True)
-                st.caption("Drag to rotate · Scroll to zoom")
+                with col_wc:
+                    wc = WordCloud(
+                        width=700, height=420,
+                        background_color=None,
+                        mode="RGBA",
+                        colormap="cool",
+                        max_words=50,
+                        prefer_horizontal=0.80,
+                        min_font_size=11,
+                        max_font_size=120,
+                        collocations=False,
+                    ).generate_from_frequencies(freq)
 
-            with col_wc:
-                wc = WordCloud(
-                    width=700, height=420,
-                    background_color=None,
-                    mode="RGBA",
-                    colormap="cool",
-                    max_words=50,
-                    prefer_horizontal=0.80,
-                    min_font_size=11,
-                    max_font_size=120,
-                    collocations=False,
-                ).generate_from_frequencies(freq)
+                    fig_wc, ax = plt.subplots(figsize=(7, 4.2))
+                    fig_wc.patch.set_alpha(0)
+                    ax.set_facecolor("none")
+                    ax.imshow(wc, interpolation="bilinear")
+                    ax.axis("off")
+                    st.pyplot(fig_wc, use_container_width=True)
+                    plt.close(fig_wc)
+                    st.caption(f"Word size = search interest · {len(freq)} countries")
+    else:
+        st.info("No regional data available for this filter combination.")
 
-                fig_wc, ax = plt.subplots(figsize=(7, 4.2))
-                fig_wc.patch.set_alpha(0)
-                ax.set_facecolor("none")
-                ax.imshow(wc, interpolation="bilinear")
-                ax.axis("off")
-                st.pyplot(fig_wc, use_container_width=True)
-                plt.close(fig_wc)
-                st.caption(f"Word size = search interest · {len(freq)} countries")
-else:
-    st.info("No regional data available for this filter combination.")
+    st.divider()
 
-st.divider()
+    # ── 5. Trend-Aligned Images ───────────────────────────────────────────────
 
+    st.subheader("🖼️ Trend-Aligned Images")
 
-# ── 5. Trend-Aligned Images ───────────────────────────────────────────────────
+    if db.has_images(search_phrase):
+        verified_images = db.load_images(search_phrase)
+    else:
+        with st.spinner("Fetching and verifying trend-aligned images…"):
+            verified_images = _run_async(
+                _scrape_and_verify(search_phrase, trend_terms, trend_term_scores)
+            )
+        db.save_images(search_phrase, verified_images)
 
-st.subheader("🖼️ Trend-Aligned Images")
+    _render_verified_grid(verified_images)
 
-if db.has_images(search_phrase):
-    verified_images = db.load_images(search_phrase)
-else:
-    with st.spinner("Fetching and verifying trend-aligned images…"):
-        verified_images = _run_async(
-            _scrape_and_verify(search_phrase, trend_terms, trend_term_scores)
-        )
-    db.save_images(search_phrase, verified_images)
-
-_render_verified_grid(verified_images)
-
-st.divider()
+    st.divider()

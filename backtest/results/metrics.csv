@@ -1,0 +1,33 @@
+query,predicted_year,confirmed,first_rising_date,peak_date,lead_weeks,scorer_flagged_rising,tp,tn,fp,fn,data_available
+bow outfit,2024,True,2024-01-01,2024-12-01,47.9,True,True,False,False,False,True
+grandpacore,2024,True,2024-01-01,2024-01-01,0.0,True,True,False,False,False,True
+jellyfish haircut,2024,True,2024-01-01,2024-01-01,0.0,True,True,False,False,False,True
+metallic outfit,2024,True,2024-01-01,2024-12-01,47.9,True,True,False,False,False,True
+western gothic outfit,2024,True,,2024-01-01,,False,False,False,False,True,True
+blue eyeshadow aesthetic,2024,True,2024-07-01,2024-07-01,0.0,True,True,False,False,False,True
+big hair accessories,2024,True,,2024-11-01,,False,False,False,False,True,True
+zero waste sewing patterns,2024,False,2024-01-01,2024-01-01,0.0,True,False,False,True,False,True
+jazz aesthetic clothing,2024,False,,2024-01-01,,False,False,True,False,False,True
+tropical outfit aesthetic,2024,True,,2024-01-01,,False,False,False,False,True,True
+customized denim jacket,2024,True,,2024-01-01,,False,False,False,False,True,True
+badminton outfit,2024,False,2024-01-01,2024-10-01,39.1,True,False,False,True,False,True
+rococo outfit,2025,True,2025-01-01,2025-01-01,0.0,True,True,False,False,False,True
+fisherman aesthetic outfit,2025,True,2025-01-01,2025-01-01,0.0,True,True,False,False,False,True
+medieval core aesthetic,2025,True,,2025-01-01,,False,False,False,False,True,True
+moto boho outfit,2025,True,,,,False,False,False,False,False,False
+dollcore aesthetic,2025,True,,2025-01-01,,False,False,False,False,True,True
+cherry red outfit,2025,True,2025-01-01,2025-12-01,47.7,True,True,False,False,False,True
+solarpunk fashion,2025,False,2025-01-01,2025-11-01,43.4,True,False,False,True,False,True
+matching couple outfits,2025,True,,2025-12-01,,False,False,False,False,True,True
+goddess drape dress,2025,True,,2025-01-01,,False,False,False,False,True,True
+baggy suit,2026,True,2026-01-01,2026-04-01,12.9,True,True,False,False,False,True
+poet core aesthetic,2026,True,2026-01-01,2026-01-01,0.0,True,True,False,False,False,True
+khaki utility outfit,2026,False,2026-01-01,2026-04-01,12.9,True,False,False,True,False,True
+lace outfit aesthetic,2026,True,2026-02-01,2026-02-01,0.0,True,True,False,False,False,True
+brooch men suit,2026,True,2026-01-01,2026-04-01,12.9,True,True,False,False,False,True
+alien core aesthetic outfit,2026,False,2026-01-01,2026-01-01,0.0,True,False,False,True,False,True
+fairycore woodland outfit,2026,False,,2026-02-01,,False,False,True,False,False,True
+ice blue aesthetic outfit,2026,True,2026-01-01,2026-04-01,12.9,True,True,False,False,False,True
+vamp romantic aesthetic,2026,False,,2026-03-01,,False,False,True,False,False,True
+glitchy glam makeup,2026,False,2026-01-01,2026-02-01,4.4,True,False,False,True,False,True
+gummy accessories aesthetic,2026,False,2026-01-01,2026-04-01,12.9,True,False,False,True,False,True
