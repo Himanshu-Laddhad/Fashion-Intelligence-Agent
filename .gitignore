@@ -68,3 +68,7 @@ models/
 Thumbs.db
 *.swp
 *~
+
+# Local agent/context docs
+AGENT_CONTEXT.md
+GEMINI_RULES.md

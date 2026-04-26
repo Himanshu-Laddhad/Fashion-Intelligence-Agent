@@ -106,7 +106,7 @@ FashionGpt_Studio/
 pip install -r requirements.txt
 ```
 
-> **Windows / Python 3.13 note:** `implicit` and `scikit-survival` are replaced by `cornac` and `lifelines` respectively — both install without C++ build tools. See `AGENT_CONTEXT.md` for details.
+> **Windows / Python 3.13 note:** `implicit` and `scikit-survival` are replaced by `cornac` and `lifelines` respectively — both install without C++ build tools.
 
 ### 2. API keys
 
@@ -228,5 +228,3 @@ DuckDB file: `outputs/fashion_intelligence.duckdb`
 | `implicit` → | `cornac>=1.18.0` (no MSVC wheels for Python 3.13) |
 | `scikit-survival` → | `lifelines` (ecos dependency requires MSVC) |
 | MLflow backend | SQLite (`mlruns/mlflow.db`) |
-
-See `AGENT_CONTEXT.md` for the full deviation log.
