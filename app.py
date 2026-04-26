@@ -322,9 +322,6 @@ with copy_col:
         st.caption(dashboard_copy["microcopy"])
     if dashboard_copy.get("normalized_phrase"):
         st.caption(f"Normalized phrase: {dashboard_copy['normalized_phrase']}")
-with metric_col:
-    st.metric("Trend Terms", len(trend_terms))
-    st.metric("Refresh", st.session_state["trend_refresh_nonce"] + 1)
 
 st.divider()
 

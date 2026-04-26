@@ -1,9 +1,8 @@
 """
 LLM provider configuration.
 
-Auto-selects Groq (preferred) or Gemini based on what credentials are present:
+Uses Groq API for all AI operations:
   • Groq    — GROQ_API_KEY set in .env              →  llama-3.3-70b-versatile
-  • Gemini  — auth.json exists in the project root  →  gemini-2.5-flash
 
 Call `call_llm(messages, max_tokens)` from anywhere in the codebase.
 The function accepts the standard OpenAI-style message list so callers
@@ -28,14 +27,9 @@ MAX_TOKENS: int = 2000
 # ── Provider constants ─────────────────────────────────────────────────────────
 
 GEMINI_MODEL = "gemini-2.5-flash"
-GEMINI_PROJECT = "analytics-agent-487705"
-GEMINI_LOCATION = "global"
-
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
-# auth.json lives in the project root (one level above this backend/ directory)
-_AUTH_JSON = Path(__file__).parent.parent / "auth.json"
-_GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "").strip()
+# Groq API key from environmentp()
 
 # ── Provider initialisation ────────────────────────────────────────────────────
 
@@ -44,6 +38,10 @@ _groq_client: Any = None
 ACTIVE_PROVIDER: str = "none"
 
 # Try Groq first (preferred)
+ifroq_client: Any = None
+ACTIVE_PROVIDER: str = "none"
+
+# Initialize Groq
 if _GROQ_API_KEY:
     try:
         from groq import Groq
@@ -52,29 +50,7 @@ if _GROQ_API_KEY:
         ACTIVE_PROVIDER = "groq"
         print(f"✅ Groq AI active ({GROQ_MODEL})")
     except Exception as _e:
-        print(f"⚠️  Groq init failed: {_e}")
-
-# Fall back to Gemini if Groq is unavailable
-if ACTIVE_PROVIDER == "none" and _AUTH_JSON.exists():
-    try:
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(_AUTH_JSON)
-        os.environ["GOOGLE_CLOUD_PROJECT"] = GEMINI_PROJECT
-        os.environ["GOOGLE_CLOUD_LOCATION"] = GEMINI_LOCATION
-        os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "True"
-
-        from google import genai
-        from google.genai.types import HttpOptions
-
-        _gemini_client = genai.Client(http_options=HttpOptions(api_version="v1"))
-        ACTIVE_PROVIDER = "gemini"
-        print(f"✅ Gemini AI active ({GEMINI_MODEL})")
-    except Exception as _e:
-        print(f"⚠️  Gemini init failed: {_e}")
-
-if ACTIVE_PROVIDER == "none":
-    print("\n" + "=" * 60)
-    print("⚠️  WARNING: No LLM provider configured")
-    print("=" * 60)
+        print(f"⚠️  Groq
     print("To enable AI analysis, configure ONE of:")
     print("  • Groq:   add GROQ_API_KEY=<key> to .env")
     print("  • Gemini: place auth.json in the project root")
@@ -91,15 +67,14 @@ def call_llm(messages: list, max_tokens: int = MAX_TOKENS) -> str:
     Synchronous LLM call — provider-agnostic.
 
     Args:
-        messages:   Standard chat message list:
-                    [{"role": "system"|"user"|"assistant", "content": "..."}]
-        max_tokens: Maximum output tokens.
+        messages:   StanGroq AI not configured")
+    print("=" * 60)
+    print("To enable AI analysis, add to .env:")
+    print("  GROQ_API_KEY=<your-groq-api-key>")
+    print("=" * 60 + "\n")
 
-    Returns:
-        The model's text response.
-
-    Raises:
-        RuntimeError if no provider is configured or the call fails.
+LLM_AVAILABLE: bool = ACTIVE_PROVIDER == "groq"
+VISION_AVAILABLE: bool = False the call fails.
     """
     if ACTIVE_PROVIDER == "gemini":
         from google.genai.types import GenerateContentConfig
