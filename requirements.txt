@@ -23,8 +23,9 @@ webdriver-manager>=4.0.0
 # Async
 aiohttp>=3.9.0
 
-# AI/LLM - FREE & FAST
+# AI/LLM
 groq>=0.4.0
+google-genai>=1.0.0
 
 # Utils
 python-dateutil>=2.8.2
@@ -33,7 +34,6 @@ python-dotenv>=1.0.0
 # Phase 1+ Dependencies
 duckdb>=0.10.0
 pytrends>=4.9.0
-praw>=7.7.0
 prophet>=1.1.5
 lifetimes>=0.11.3
 cornac>=1.18.0
@@ -48,3 +48,5 @@ statsmodels>=0.14.0
 scipy>=1.11.0
 plotly>=5.20.0
 pymannkendall>=1.4.3
+wordcloud>=1.9.0
+matplotlib>=3.8.0
