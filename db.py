@@ -29,9 +29,33 @@ def _connect() -> sqlite3.Connection:
             search_term TEXT,
             description TEXT,
             caption     TEXT,
-            verified    INTEGER DEFAULT 0
+            verified    INTEGER DEFAULT 0,
+            fashion_score REAL,
+            trend_match REAL,
+            style_match REAL,
+            freshness REAL,
+            quality REAL,
+            score_reason TEXT
         );
     """)
+
+    # Backward-compatible schema upgrades for existing caches.
+    cols = {
+        row[1]
+        for row in con.execute("PRAGMA table_info(pinterest_images)").fetchall()
+    }
+    upgrades = [
+        ("fashion_score", "REAL"),
+        ("trend_match", "REAL"),
+        ("style_match", "REAL"),
+        ("freshness", "REAL"),
+        ("quality", "REAL"),
+        ("score_reason", "TEXT"),
+    ]
+    for col, ctype in upgrades:
+        if col not in cols:
+            con.execute(f"ALTER TABLE pinterest_images ADD COLUMN {col} {ctype}")
+
     return con
 
 
@@ -110,7 +134,22 @@ def has_images(search_term: str) -> bool:
 def save_images(search_term: str, images: list[dict]) -> None:
     with _connect() as con:
         con.executemany(
-            "INSERT OR IGNORE INTO pinterest_images (url, search_term, description, caption, verified) VALUES (?,?,?,?,?)",
+            """
+            INSERT INTO pinterest_images
+            (url, search_term, description, caption, verified, fashion_score, trend_match, style_match, freshness, quality, score_reason)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(url) DO UPDATE SET
+                search_term=excluded.search_term,
+                description=excluded.description,
+                caption=excluded.caption,
+                verified=excluded.verified,
+                fashion_score=excluded.fashion_score,
+                trend_match=excluded.trend_match,
+                style_match=excluded.style_match,
+                freshness=excluded.freshness,
+                quality=excluded.quality,
+                score_reason=excluded.score_reason
+            """,
             [
                 (
                     img.get("url"),
@@ -118,6 +157,12 @@ def save_images(search_term: str, images: list[dict]) -> None:
                     img.get("description"),
                     img.get("caption"),
                     int(img.get("verified", False)),
+                    img.get("fashion_score"),
+                    img.get("trend_match"),
+                    img.get("style_match"),
+                    img.get("freshness"),
+                    img.get("quality"),
+                    img.get("score_reason"),
                 )
                 for img in images
                 if img.get("url")
@@ -128,10 +173,35 @@ def save_images(search_term: str, images: list[dict]) -> None:
 def load_images(search_term: str) -> list[dict]:
     with _connect() as con:
         rows = con.execute(
-            "SELECT url, description, caption, verified FROM pinterest_images WHERE search_term=?",
+            """
+            SELECT
+                url,
+                description,
+                caption,
+                verified,
+                fashion_score,
+                trend_match,
+                style_match,
+                freshness,
+                quality,
+                score_reason
+            FROM pinterest_images
+            WHERE search_term=?
+            """,
             (search_term,),
         ).fetchall()
     return [
-        {"url": r[0], "description": r[1], "caption": r[2], "verified": bool(r[3])}
+        {
+            "url": r[0],
+            "description": r[1],
+            "caption": r[2],
+            "verified": bool(r[3]),
+            "fashion_score": r[4],
+            "trend_match": r[5],
+            "style_match": r[6],
+            "freshness": r[7],
+            "quality": r[8],
+            "score_reason": r[9],
+        }
         for r in rows
     ]

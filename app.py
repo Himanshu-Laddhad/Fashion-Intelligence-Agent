@@ -15,12 +15,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import db
 from backend.ai_analyzer import generate_dashboard_copy, verify_and_caption_images
+from backend.fashion_scorer import score_and_rank_images
 from data_sources.google_trends import compute_trend_momentum
 from scrapers.pinterest_scraper import scrape_pinterest_optimized
-from ui_components import (
-    render_color_palette,
-    render_vibe_gallery,
-)
 
 
 # ── Page config ───────────────────────────────────────────────────────────────
@@ -192,7 +189,9 @@ def _collect_trend_terms(related_queries: dict, query: str, limit: int = 10) -> 
     if not rows:
         return pd.DataFrame(columns=["Rank", "Trend", "Value"])
 
-    trend_df = pd.DataFrame(rows).drop_duplicates(subset=["Trend"]).head(limit)
+    trend_df = pd.DataFrame(rows)
+    trend_df["_lower"] = trend_df["Trend"].str.lower()
+    trend_df = trend_df.drop_duplicates(subset=["_lower"]).drop(columns=["_lower"]).head(limit)
     trend_df.insert(0, "Rank", range(1, len(trend_df) + 1))
     return trend_df
 
@@ -339,7 +338,11 @@ def _build_trend_bubble_figure(trend_terms_df: pd.DataFrame) -> go.Figure | None
     return fig_bubbles
 
 
-async def _scrape_and_verify(search_phrase: str, trend_terms: list[str]) -> list[dict]:
+async def _scrape_and_verify(
+    search_phrase: str,
+    trend_terms: list[str],
+    trend_term_scores: dict[str, float],
+) -> list[dict]:
     """Scrape Pinterest images and verify with LLM."""
     queries = [search_phrase]
     for term in trend_terms:
@@ -371,7 +374,15 @@ async def _scrape_and_verify(search_phrase: str, trend_terms: list[str]) -> list
                 break
 
     urls = [img["url"] for img in collected]
-    return await verify_and_caption_images(urls, search_phrase, limit=6)
+    verified = await verify_and_caption_images(urls, search_phrase, limit=MAX_IMAGES)
+    ranked = await score_and_rank_images(
+        images=verified,
+        search_phrase=search_phrase,
+        trend_terms=trend_terms,
+        trend_term_scores=trend_term_scores,
+        top_k=6,
+    )
+    return ranked
 
 
 def _render_verified_grid(verified_images: list) -> None:
@@ -400,6 +411,9 @@ def _render_verified_grid(verified_images: list) -> None:
                 caption = shown[img_idx].get("caption")
                 if caption:
                     st.caption(caption)
+                score = shown[img_idx].get("fashion_score")
+                if score is not None:
+                    st.caption(f"Fashion Score: {float(score):.1f}/100")
 
 
 # ── Session state ─────────────────────────────────────────────────────────────
@@ -460,6 +474,15 @@ st.markdown(f"**Search phrase:** {search_phrase}")
 if db.has_trend(search_phrase, timeframe):
     ts_df, region_df, trend_terms_df = db.load_trend(search_phrase, timeframe)
     trend_terms = trend_terms_df["Trend"].tolist() if not trend_terms_df.empty else []
+    trend_term_scores = (
+        {
+            str(row["Trend"]): float(row["Value"])
+            for _, row in trend_terms_df.iterrows()
+            if row.get("Trend") and row.get("Value") is not None and not pd.isna(row.get("Value"))
+        }
+        if trend_terms_df is not None and not trend_terms_df.empty
+        else {}
+    )
 else:
     with st.spinner(f"Fetching live trends for '{search_phrase}'…"):
         ts_df          = _fetch_interest_over_time(search_phrase, timeframe)
@@ -467,11 +490,24 @@ else:
         related        = _fetch_related_queries(search_phrase)
         trend_terms_df = _collect_trend_terms(related, search_phrase, limit=10)
         trend_terms    = trend_terms_df["Trend"].tolist() if not trend_terms_df.empty else []
+        trend_term_scores = (
+            {
+                str(row["Trend"]): float(row["Value"])
+                for _, row in trend_terms_df.iterrows()
+                if row.get("Trend") and row.get("Value") is not None and not pd.isna(row.get("Value"))
+            }
+            if trend_terms_df is not None and not trend_terms_df.empty
+            else {}
+        )
         db.save_trend(search_phrase, timeframe, ts_df, region_df, trend_terms_df)
 
-dashboard_copy = _run_async(
-    generate_dashboard_copy(filters=filters, search_phrase=search_phrase, trend_terms=trend_terms)
-)
+_copy_key = f"{search_phrase}:{st.session_state['trend_refresh_nonce']}"
+if st.session_state.get("_copy_cache_key") != _copy_key:
+    st.session_state["dashboard_copy"] = _run_async(
+        generate_dashboard_copy(filters=filters, search_phrase=search_phrase, trend_terms=trend_terms)
+    )
+    st.session_state["_copy_cache_key"] = _copy_key
+dashboard_copy = st.session_state["dashboard_copy"]
 
 copy_col, metric_col = st.columns([3, 1])
 with copy_col:
@@ -604,23 +640,7 @@ else:
 st.divider()
 
 
-# ── 3A. Trend Color Palette ───────────────────────────────────────────────────
-
-if dashboard_copy:
-    if dashboard_copy.get("dominant_palette"):
-        render_color_palette(dashboard_copy["dominant_palette"], "Trend Palette")
-
-
-# ── 3B. Aesthetic Vibes ───────────────────────────────────────────────────────
-
-if dashboard_copy:
-    vibes = dashboard_copy.get("aesthetic_vibes", [])
-    vibe_confidence = dashboard_copy.get("vibe_confidence", {})
-    if vibes:
-        render_vibe_gallery(vibes, vibe_confidence)
-
-
-# ── 3D. Geographic Interest ────────────────────────────────────────────────────
+# ── 3. Geographic Interest ────────────────────────────────────────────────────
 
 st.subheader("🌍 Geographic Interest")
 
@@ -717,7 +737,9 @@ if db.has_images(search_phrase):
     verified_images = db.load_images(search_phrase)
 else:
     with st.spinner("Fetching and verifying trend-aligned images…"):
-        verified_images = _run_async(_scrape_and_verify(search_phrase, trend_terms))
+        verified_images = _run_async(
+            _scrape_and_verify(search_phrase, trend_terms, trend_term_scores)
+        )
     db.save_images(search_phrase, verified_images)
 
 _render_verified_grid(verified_images)
