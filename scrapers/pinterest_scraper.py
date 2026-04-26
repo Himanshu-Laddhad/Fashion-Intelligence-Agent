@@ -121,7 +121,11 @@ async def scrape_pinterest_optimized(
         
         except Exception as e:
             print(f"   ⚠️ Pinterest scraping error: {e}")
-            driver.quit() if 'driver' in locals() else None
+            if 'driver' in locals():
+                try:
+                    driver.quit()
+                except:
+                    pass
             final_images = []
         
         # Create DataFrame

@@ -137,7 +137,7 @@ Rules:
         if all(k in parsed for k in ["headline", "summary", "microcopy", "normalized_phrase"]):
             return parsed
         raise ValueError("Missing required keys in response")
-    except Exception as exc:
+    except (ValueError, KeyError, RuntimeError, json.JSONDecodeError) as exc:
         print(f"   ⚠️ generate_dashboard_copy error: {exc}")
         return fallback_dashboard_copy(filters, search_phrase, trend_terms)
 
@@ -148,8 +148,9 @@ Rules:
 
 def _upgrade_pinterest_url(url: str) -> str:
     """Swap Pinterest thumbnail size prefix to 736x for higher resolution."""
-    if "pinimg.com" in url:
-        url = re.sub(r"/\d+x\d*?/", "/736x/", url)
+    if not isinstance(url, str) or not url or "pinimg.com" not in url:
+        return url if isinstance(url, str) else ""
+    url = re.sub(r"/\d+x\d*?/", "/736x/", url)
     return url
 
 
@@ -159,9 +160,9 @@ async def verify_and_caption_images(
     limit: int = 6,
 ) -> List[Dict[str, Any]]:
     """
-    Upgrade Pinterest URLs to 736x, then use Gemini vision to verify relevance
+    Upgrade Pinterest URLs to 736x, then use Groq's Llama 4 Scout vision model to verify relevance
     and generate a short caption for each image. Falls back to returning all
-    images unverified when vision (Gemini) is unavailable.
+    images unverified when vision is unavailable.
 
     Returns up to `limit` relevant images as:
         [{"url": str, "caption": str | None, "verified": bool}]
@@ -208,6 +209,9 @@ async def verify_and_caption_images(
                 "verified": True,
                 "relevant": bool(parsed.get("relevant", True)),
             }
+        except (_requests.Timeout, _requests.ConnectionError) as exc:
+            print(f"   ⚠️ Image download timeout/connection error ({url[:50]}…): {exc}")
+            return {"url": url, "caption": None, "verified": False, "relevant": True}
         except Exception as exc:
             print(f"   ⚠️ Image verification skipped ({url[:50]}…): {exc}")
             return {"url": url, "caption": None, "verified": False, "relevant": True}
@@ -282,8 +286,19 @@ RULES:
     analysis = _extract_json(response_text)
     analysis["query"] = query
 
-    if not all(k in analysis for k in ["key_trends", "dominant_palette", "materials", "aesthetic_vibes"]):
-        raise ValueError("Missing required keys in LLM analysis response")
+    required_keys = ["key_trends", "dominant_palette", "materials", "aesthetic_vibes"]
+    if not all(k in analysis for k in required_keys):
+        print(f"   ⚠️ LLM analysis missing keys: {[k for k in required_keys if k not in analysis]}")
+        # Provide sensible defaults
+        return {
+            "key_trends": [query],
+            "dominant_palette": ["neutral", "black", "white"],
+            "materials": ["cotton", "denim", "wool"],
+            "aesthetic_vibes": ["contemporary"],
+            "market_confidence": "low",
+            "analysis_note": "LLM response incomplete; using defaults",
+            "query": query,
+        }
 
     return analysis
 

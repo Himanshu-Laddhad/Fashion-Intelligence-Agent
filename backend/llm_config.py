@@ -10,7 +10,6 @@ don't need to know which provider is active.
 """
 
 import os
-from pathlib import Path
 from typing import Any
 
 try:
@@ -26,19 +25,16 @@ MAX_TOKENS: int = 2000
 
 # ── Provider constants ─────────────────────────────────────────────────────────
 
-GEMINI_MODEL = "gemini-2.5-flash"
-GROQ_MODEL = "llama-3.3-70b-versatile"
+# Model names (configurable via environment variables)
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
 
-# Groq API key from environmentp()
+# Groq API key from environment
+_GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "").strip()
 
 # ── Provider initialisation ────────────────────────────────────────────────────
 
-_gemini_client: Any = None
 _groq_client: Any = None
-ACTIVE_PROVIDER: str = "none"
-
-# Try Groq first (preferred)
-ifroq_client: Any = None
 ACTIVE_PROVIDER: str = "none"
 
 # Initialize Groq
@@ -50,67 +46,51 @@ if _GROQ_API_KEY:
         ACTIVE_PROVIDER = "groq"
         print(f"✅ Groq AI active ({GROQ_MODEL})")
     except Exception as _e:
-        print(f"⚠️  Groq
-    print("To enable AI analysis, configure ONE of:")
-    print("  • Groq:   add GROQ_API_KEY=<key> to .env")
-    print("  • Gemini: place auth.json in the project root")
-    print("=" * 60 + "\n")
+        print(f"⚠️  Groq init failed: {_e}")
 
-LLM_AVAILABLE: bool = ACTIVE_PROVIDER != "none"
-VISION_AVAILABLE: bool = ACTIVE_PROVIDER == "gemini"
-
-
-# ── Unified call interfaces ────────────────────────────────────────────────────
-
-def call_llm(messages: list, max_tokens: int = MAX_TOKENS) -> str:
-    """
-    Synchronous LLM call — provider-agnostic.
-
-    Args:
-        messages:   StanGroq AI not configured")
+if ACTIVE_PROVIDER == "none":
+    print("\n" + "=" * 60)
+    print("⚠️  WARNING: Groq AI not configured")
     print("=" * 60)
     print("To enable AI analysis, add to .env:")
     print("  GROQ_API_KEY=<your-groq-api-key>")
     print("=" * 60 + "\n")
 
 LLM_AVAILABLE: bool = ACTIVE_PROVIDER == "groq"
-VISION_AVAILABLE: bool = False the call fails.
+VISION_AVAILABLE: bool = ACTIVE_PROVIDER == "groq"
+
+
+# ── Unified call interfaces ────────────────────────────────────────────────────
+
+def call_llm(messages: list, max_tokens: int = MAX_TOKENS) -> str:
     """
-    if ACTIVE_PROVIDER == "gemini":
-        from google.genai.types import GenerateContentConfig
+    Synchronous LLM call — Groq only.
 
-        system_parts = [m["content"] for m in messages if m["role"] == "system"]
-        user_parts = [m["content"] for m in messages if m["role"] in ("user", "assistant")]
+    Args:
+        messages:   Standard chat message list:
+                    [{"role": "system"|"user"|"assistant", "content": "..."}]
+        max_tokens: Maximum output tokens.
 
-        config_kwargs: dict = {
-            "temperature": TEMPERATURE,
-            "max_output_tokens": max_tokens,
-        }
-        if system_parts:
-            config_kwargs["system_instruction"] = "\n".join(system_parts)
+    Returns:
+        The model's text response.
 
-        response = _gemini_client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents="\n\n".join(user_parts),
-            config=GenerateContentConfig(**config_kwargs),
+    Raises:
+        RuntimeError if Groq is not configured or the call fails.
+    """
+    if ACTIVE_PROVIDER != "groq":
+        raise RuntimeError(
+            "Groq is not configured. Add GROQ_API_KEY=<key> to .env"
         )
-        return response.text
 
-    if ACTIVE_PROVIDER == "groq":
-        response = _groq_client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=messages,
-            temperature=TEMPERATURE,
-            max_tokens=max_tokens,
-            top_p=1,
-            stream=False,
-        )
-        return response.choices[0].message.content
-
-    raise RuntimeError(
-        "No LLM provider is configured. "
-        "Add auth.json (Gemini) or GROQ_API_KEY in .env (Groq)."
+    response = _groq_client.chat.completions.create(
+        model=GROQ_MODEL,
+        messages=messages,
+        temperature=TEMPERATURE,
+        max_tokens=max_tokens,
+        top_p=1,
+        stream=False,
     )
+    return response.choices[0].message.content
 
 
 def call_llm_vision(
@@ -120,23 +100,49 @@ def call_llm_vision(
     max_tokens: int = 200,
 ) -> str:
     """
-    Synchronous multimodal (vision) call — Gemini only.
-    Raises RuntimeError when the active provider doesn't support vision.
+    Multimodal (vision) call — uses Groq's Llama 4 Scout vision model.
+    
+    Args:
+        prompt:     Vision analysis prompt
+        image_bytes: Raw image bytes
+        mime_type:   Image MIME type (e.g., "image/jpeg")
+        max_tokens:  Maximum output tokens
+    
+    Returns:
+        The model's text response analyzing the image.
+    
+    Raises:
+        RuntimeError if Groq is not configured or the call fails.
     """
-    if ACTIVE_PROVIDER != "gemini" or _gemini_client is None:
-        raise RuntimeError("Vision requires Gemini (auth.json in project root)")
-
-    from google import genai as _genai
-    from google.genai.types import GenerateContentConfig
-
-    response = _gemini_client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=[
-            _genai.types.Part(text=prompt),
-            _genai.types.Part(
-                inline_data=_genai.types.Blob(mime_type=mime_type, data=image_bytes)
-            ),
+    import base64
+    
+    if ACTIVE_PROVIDER != "groq":
+        raise RuntimeError(
+            "Vision requires Groq to be configured. Add GROQ_API_KEY=<key> to .env"
+        )
+    
+    # Encode image to base64
+    image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+    
+    response = _groq_client.chat.completions.create(
+        model=GROQ_VISION_MODEL,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime_type};base64,{image_base64}"
+                        },
+                    },
+                ],
+            }
         ],
-        config=GenerateContentConfig(temperature=0.1, max_output_tokens=max_tokens),
+        temperature=0.1,
+        max_tokens=max_tokens,
+        top_p=1,
+        stream=False,
     )
-    return response.text
+    return response.choices[0].message.content

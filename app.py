@@ -90,7 +90,17 @@ def _build_search_phrase(filters: dict) -> str:
 
 
 def _run_async(coro):
-    return asyncio.run(coro)
+    """Run async coroutine safely in Streamlit context."""
+    try:
+        loop = asyncio.get_running_loop()
+        # Already in event loop - create new one in executor thread
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            future = pool.submit(asyncio.run, coro)
+            return future.result()
+    except RuntimeError:
+        # No running loop, safe to use asyncio.run
+        return asyncio.run(coro)
 
 
 def _fetch_interest_over_time(query: str, timeframe: str) -> pd.DataFrame:
@@ -99,7 +109,7 @@ def _fetch_interest_over_time(query: str, timeframe: str) -> pd.DataFrame:
         pt = TrendReq(hl="en-US", tz=360)
         pt.build_payload([query], cat=0, timeframe=timeframe, geo="", gprop="")
         return pt.interest_over_time()
-    except Exception as exc:
+    except (ConnectionError, ValueError, KeyError, Exception) as exc:
         st.warning(f"⚠️ pytrends error: {exc}")
         return pd.DataFrame()
 
@@ -110,7 +120,7 @@ def _fetch_region_interest(query: str, timeframe: str) -> pd.DataFrame:
         pt = TrendReq(hl="en-US", tz=360)
         pt.build_payload([query], cat=0, timeframe=timeframe, geo="", gprop="")
         return pt.interest_by_region(resolution="COUNTRY", inc_low_vol=False).reset_index()
-    except Exception as exc:
+    except (ConnectionError, ValueError, KeyError, Exception) as exc:
         st.warning(f"⚠️ pytrends region error: {exc}")
         return pd.DataFrame()
 
@@ -121,7 +131,7 @@ def _fetch_related_queries(query: str) -> dict:
         pt = TrendReq(hl="en-US", tz=360)
         pt.build_payload([query], cat=0, timeframe="today 12-m", geo="", gprop="")
         return pt.related_queries()
-    except Exception as exc:
+    except (ConnectionError, ValueError, KeyError, Exception) as exc:
         st.warning(f"⚠️ pytrends related query error: {exc}")
         return {}
 
@@ -146,14 +156,17 @@ def _build_momentum_table(ts_df: pd.DataFrame, query: str) -> pd.DataFrame:
 
 
 def _collect_trend_terms(related_queries: dict, query: str, limit: int = 10) -> pd.DataFrame:
+    if not related_queries:
+        return pd.DataFrame(columns=["Rank", "Trend", "Value"])
+    
     bucket = related_queries.get(query)
-    if bucket is None and related_queries:
-        bucket = next(iter(related_queries.values()))
-
-    rows = []
-    if not bucket:
+    if bucket is None:
+        bucket = next(iter(related_queries.values()), None)
+    
+    if not bucket or not isinstance(bucket, dict):
         return pd.DataFrame(columns=["Rank", "Trend", "Value"])
 
+    rows = []
     for source in ("top", "rising"):
         df = bucket.get(source)
         if df is None or df.empty:
@@ -223,7 +236,7 @@ def _render_verified_grid(verified_images: list) -> None:
 
     verified_count = sum(1 for img in shown if img.get("verified"))
     label = (
-        f"{len(shown)} images · {verified_count} verified by Gemini Vision"
+        f"{len(shown)} images · {verified_count} verified by Groq Vision"
         if verified_count
         else f"{len(shown)} trend-aligned images from Pinterest"
     )

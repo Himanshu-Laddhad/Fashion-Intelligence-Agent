@@ -5,20 +5,19 @@ from pytrends.request import TrendReq
 
 
 def fetch_trend_timeseries(query: str, timeframe: str = "today 5-y") -> pd.DataFrame:
-    """Fetch Google Trends interest-over-time for a single query."""
+    """Fetch Google Trends interest-over-time for a single query. Returns empty DataFrame on error."""
     try:
         pt = TrendReq(hl="en-US", tz=360)
         pt.build_payload([query], cat=0, timeframe=timeframe, geo="", gprop="")
-        df = pt.interest_over_time()
         time.sleep(2)
-        return df
+        return pt.interest_over_time()
     except Exception as exc:
         print(f"⚠️  pytrends warning for '{query}': {exc}")
         return pd.DataFrame()
 
 
 def fetch_related_queries(query: str) -> dict:
-    """Fetch Google Trends related queries for a single query."""
+    """Fetch Google Trends related queries for a single query. Returns empty dict on error."""
     try:
         pt = TrendReq(hl="en-US", tz=360)
         pt.build_payload([query], cat=0, timeframe="today 5-y", geo="", gprop="")

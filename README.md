@@ -9,7 +9,8 @@
 | Layer | What it does |
 |---|---|
 | **Trend Scraping** | Fetches live data from Pinterest, Zara, Uniqlo, and Vogue via Firecrawl |
-| **AI Analysis** | Summarises trends and generates brand-specific insights using Groq LLM |
+| **AI Analysis** | Summarises trends and generates brand-specific insights using Groq LLM (text + vision) |
+| **Image Intelligence** | Verifies and captions fashion images using Groq's Llama 4 Scout vision model |
 | **Trend Velocity Index** | Scores each trend using Google Trends + social + retail presence |
 | **Customer Intelligence** | RFM segmentation, churn labelling, CLV prediction, survival analysis, collaborative filtering |
 | **Analytics Dashboard** | Live Streamlit page reading directly from DuckDB |

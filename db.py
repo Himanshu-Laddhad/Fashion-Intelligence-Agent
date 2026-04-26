@@ -5,6 +5,7 @@ Entries are wiped and rewritten on each manual refresh.
 
 import sqlite3
 from pathlib import Path
+from typing import Optional
 
 import pandas as pd
 
@@ -57,7 +58,7 @@ def save_trend(
     region_df: pd.DataFrame,
     terms_df: pd.DataFrame,
 ) -> None:
-    def _ser(df: pd.DataFrame) -> str | None:
+    def _ser(df: pd.DataFrame) -> Optional[str]:
         if df is None or df.empty:
             return None
         return df.reset_index().to_json(orient="records", date_format="iso")
