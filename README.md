@@ -1,6 +1,18 @@
-# Fashion Intelligence Studio
+# Retail Trend Intelligence Platform
 
-A Streamlit fashion trend dashboard that combines Google Trends signals, Pinterest image scraping, and Groq-powered text/vision analysis.
+Built a real-time trend momentum detection system for fashion retail, aggregating Google Trends signals and social media imagery to classify product categories as rising, stable, or falling — applicable to trend-driven inventory and assortment planning at fashion retailers.
+
+The system computes a directional momentum score for any fashion query, surfaces regionally segmented demand signals across 200+ countries, and ranks visual references by a composite Fashion Relevance Trend Score — giving buyers and planners a single interface to move from search to decision.
+
+---
+
+## Business applications
+
+- **Trend desk (Nike, Adidas):** Monitor week-over-week momentum on silhouettes, colorways, and collaboration categories. Flag rising signals before they peak so product teams can accelerate sampling or marketing spend.
+- **Assortment planning (Zara, H&M):** Use rising/stable/falling classification to adjust open-to-buy allocations per category each buying cycle — reduce exposure on falling trends, deepen buys on rising ones.
+- **Seasonal buying (Nordstrom, Bloomingdale's):** Compare regional demand heatmaps to identify where a trend is gaining traction earliest, informing which markets get early-season depth versus a wait-and-see position.
+- **Wholesale & brand sales (PVH, Tapestry):** Equip sales teams with objective trend velocity data to present to retail accounts, replacing anecdotal pitch decks with quantified demand signals.
+- **E-commerce merchandising (ASOS, Revolve):** Feed momentum scores into on-site ranking logic to surface rising-trend products higher in search and category pages without waiting for sales data to accumulate.
 
 ---
 
