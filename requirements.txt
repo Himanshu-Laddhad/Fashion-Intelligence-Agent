@@ -10,7 +10,6 @@ pandas>=2.0.0
 requests>=2.31.0
 
 # Scraping
-firecrawl-py>=0.0.16
 crawl4ai>=0.3.0
 beautifulsoup4>=4.12.2
 lxml>=4.9.0

@@ -1,6 +1,6 @@
 # Fashion Intelligence Studio
 
-> Real-time fashion trend analysis + customer intelligence — powered by Firecrawl, Groq LLM, DuckDB, and a full analytics pipeline.
+> Real-time fashion trend analysis + customer intelligence — powered by Groq LLM, DuckDB, and a full analytics pipeline.
 
 ---
 
@@ -8,7 +8,7 @@
 
 | Layer | What it does |
 |---|---|
-| **Trend Scraping** | Fetches live data from Pinterest, Zara, Uniqlo, and Vogue via Firecrawl |
+| **Trend Scraping** | Fetches live data from Pinterest and Google Trends |
 | **AI Analysis** | Summarises trends and generates brand-specific insights using Groq LLM (text + vision) |
 | **Image Intelligence** | Verifies and captions fashion images using Groq's Llama 4 Scout vision model |
 | **Trend Velocity Index** | Scores each trend using Google Trends + social + retail presence |
@@ -58,8 +58,7 @@ FashionGpt_Studio/
 │   ├── pinterest_scraper.py
 │   ├── zara_scraper.py
 │   ├── uniqlo_scraper.py
-│   ├── vogue_scraper.py
-│   └── firecrawl_config.py         # Firecrawl API key + scrape options
+│   └── vogue_scraper.py
 │
 ├── data_sources/
 │   ├── google_trends.py            # pytrends wrapper + momentum scorer
@@ -114,14 +113,10 @@ pip install -r requirements.txt
 Create a `.env` file (or set environment variables):
 
 ```env
-FIRECRAWL_API_KEY=fc-...
 GROQ_API_KEY=gsk_...
 ```
 
-`FIRECRAWL_API_KEY` can also be set directly in `scrapers/firecrawl_config.py`.
-
 Groq is free — get a key at [console.groq.com](https://console.groq.com).  
-Firecrawl — get a key at [firecrawl.dev](https://www.firecrawl.dev).
 
 ### 3. (Optional) H&M dataset
 
