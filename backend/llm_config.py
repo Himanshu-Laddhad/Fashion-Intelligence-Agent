@@ -1,9 +1,9 @@
 """
 LLM provider configuration.
 
-Auto-selects Gemini (preferred) or Groq based on what credentials are present:
-  • Gemini  — auth.json exists in the project root  →  gemini-2.5-flash via Vertex AI
+Auto-selects Groq (preferred) or Gemini based on what credentials are present:
   • Groq    — GROQ_API_KEY set in .env              →  llama-3.3-70b-versatile
+  • Gemini  — auth.json exists in the project root  →  gemini-2.5-flash
 
 Call `call_llm(messages, max_tokens)` from anywhere in the codebase.
 The function accepts the standard OpenAI-style message list so callers
@@ -43,8 +43,19 @@ _gemini_client: Any = None
 _groq_client: Any = None
 ACTIVE_PROVIDER: str = "none"
 
-# Try Gemini first (preferred — no quota concerns, uses service account)
-if _AUTH_JSON.exists():
+# Try Groq first (preferred)
+if _GROQ_API_KEY:
+    try:
+        from groq import Groq
+
+        _groq_client = Groq(api_key=_GROQ_API_KEY)
+        ACTIVE_PROVIDER = "groq"
+        print(f"✅ Groq AI active ({GROQ_MODEL})")
+    except Exception as _e:
+        print(f"⚠️  Groq init failed: {_e}")
+
+# Fall back to Gemini if Groq is unavailable
+if ACTIVE_PROVIDER == "none" and _AUTH_JSON.exists():
     try:
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(_AUTH_JSON)
         os.environ["GOOGLE_CLOUD_PROJECT"] = GEMINI_PROJECT
@@ -56,28 +67,17 @@ if _AUTH_JSON.exists():
 
         _gemini_client = genai.Client(http_options=HttpOptions(api_version="v1"))
         ACTIVE_PROVIDER = "gemini"
-        print(f"✅ Gemini AI active ({GEMINI_MODEL} via Vertex AI)")
+        print(f"✅ Gemini AI active ({GEMINI_MODEL})")
     except Exception as _e:
         print(f"⚠️  Gemini init failed: {_e}")
-
-# Fall back to Groq if Gemini is unavailable
-if ACTIVE_PROVIDER == "none" and _GROQ_API_KEY:
-    try:
-        from groq import Groq
-
-        _groq_client = Groq(api_key=_GROQ_API_KEY)
-        ACTIVE_PROVIDER = "groq"
-        print(f"✅ Groq API active ({GROQ_MODEL})")
-    except Exception as _e:
-        print(f"⚠️  Groq init failed: {_e}")
 
 if ACTIVE_PROVIDER == "none":
     print("\n" + "=" * 60)
     print("⚠️  WARNING: No LLM provider configured")
     print("=" * 60)
     print("To enable AI analysis, configure ONE of:")
-    print("  • Gemini: place auth.json in the project root")
     print("  • Groq:   add GROQ_API_KEY=<key> to .env")
+    print("  • Gemini: place auth.json in the project root")
     print("=" * 60 + "\n")
 
 LLM_AVAILABLE: bool = ACTIVE_PROVIDER != "none"
